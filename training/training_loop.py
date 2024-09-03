@@ -104,12 +104,6 @@ def training_loop(
     dataset_sampler = misc.InfiniteSampler(dataset=dataset_obj, rank=dist.get_rank(), num_replicas=dist.get_world_size(), seed=seed)
     dataset_iterator = iter(torch.utils.data.DataLoader(dataset=dataset_obj, sampler=dataset_sampler, batch_size=batch_gpu, **data_loader_kwargs))
 
-    # Load validation dataset.
-    # dist.print0('Loading validation dataset...')
-    # val_dataset_obj = dnnlib.util.construct_class_by_name(**val_dataset_kwargs) # subclass of training.dataset.Dataset
-    # val_dataset_sampler = misc.InfiniteSampler(dataset=val_dataset_obj, rank=dist.get_rank(), num_replicas=dist.get_world_size(), seed=seed)
-    # val_dataset_iterator = iter(torch.utils.data.DataLoader(dataset=val_dataset_obj, sampler=val_dataset_sampler, batch_size=1, **data_loader_kwargs))
-
 
     # Construct network.
     dist.print0('Constructing network...')
@@ -118,13 +112,6 @@ def training_loop(
 
 
     net.train().requires_grad_(True).to(device)
-    # with torch.no_grad():
-    #     #images = torch.zeros([batch_gpu, net.img_channels, net.img_resolution, net.img_resolution], device=device)
-    #     images = torch.zeros([batch_gpu, 1, net.img_resolution, net.img_resolution], device=device)
-    #     conds = torch.zeros([batch_gpu, 2, net.img_resolution, net.img_resolution], device=device)
-    #     sigma = torch.ones([batch_gpu], device=device)
-    #     labels = torch.zeros([batch_gpu, net.label_dim], device=device)
-    #     misc.print_module_summary(net, [images,conds, sigma, labels], max_nesting=2)
 
     # Setup optimizer.
     dist.print0('Setting up optimizer...')
@@ -159,7 +146,6 @@ def training_loop(
     # Train.
     dist.print0(f'Training for {total_kimg} kimg...')
     cur_nimg = resume_kimg * 1000
-    # cur_tick = 0
     cur_tick = resume_kimg // kimg_per_tick
     dist.print0("Starting from tick: ")
     dist.print0(f'Starting wandb step: {cur_tick * snapshot_ticks}')
@@ -172,39 +158,6 @@ def training_loop(
 
     while True:
 
-        # Validation
-        #if cur_tick % val_interval == 0: #and dist.get_rank() == 0:
-            # val_loss = evaluate_validation_set(ddp, val_dataset_iterator, loss_fn, device, augment_pipe)
-            # training_stats.report('Loss/loss_val', val_loss)
-            # #wandb.log({'Validation Loss': val_loss}, step=cur_tick)
-            # print(f"Validation loss at tick {cur_tick}: {val_loss}")
-
-
-        # # Validation
-        # if cur_tick % val_interval == 0:
-        #     if dist.get_rank() == 0:
-        #         with torch.no_grad():
-        #             #for round_idx in range(num_accumulation_rounds):
-        #                 #with misc.ddp_sync(ddp, (round_idx == num_accumulation_rounds - 1)):
-        #             print("VALIDATIno inside")
-        #             dataset_iter = next(val_dataset_iterator)
-                    
-        #             images, labels, d = dataset_iter
-
-        #             d = d.to(device).to(torch.float32)
-        #             images = images.to(device).to(torch.float32)
-        #             labels = labels.to(device)
-
-        #             val_loss = loss_fn(net=ddp, images=images, labels=labels, augment_pipe=augment_pipe, d=d)
-                    
-        #             training_stats.report('Loss/loss_val', val_loss)
-        #             del d 
-        #             del images 
-        #             del labels 
-        #             torch.cuda.empty_cache() # also try inside of the no grad
-        #             gc.collect()
-        # torch.distributed.barrier()
-
         # Accumulate gradients.
         optimizer.zero_grad(set_to_none=True)
         for round_idx in range(num_accumulation_rounds):
@@ -213,11 +166,6 @@ def training_loop(
                 dataset_iter = next(dataset_iterator)
                 
                 images, labels, d = dataset_iter
-
-                #pdb.set_trace()
-
-                d = torch.from_numpy(np.random.randn(1,2,1024,1024))
-                images = torch.from_numpy(np.random.randn(1,1,1024,1024))
 
                 d = d.to(device).to(torch.float32)
                 images = images.to(device).to(torch.float32)
@@ -254,11 +202,6 @@ def training_loop(
         ema_beta = 0.5 ** (batch_size / max(ema_halflife_nimg, 1e-8))
         for p_ema, p_net in zip(ema.parameters(), net.parameters()):
             p_ema.copy_(p_net.detach().lerp(p_ema, ema_beta))
-
-        
-   
-          
-               
 
 
         # Perform maintenance tasks once per tick.
