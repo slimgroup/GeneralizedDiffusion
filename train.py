@@ -125,12 +125,9 @@ def main(**kwargs):
     c = dnnlib.EasyDict()
     c.update(max_grad_norm=opts.max_grad_norm)
     c.dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=opts.data, dataset_main_name = opts.dataset_main_name,dataset_main_name_cond = opts.dataset_main_name_cond,dataset_main_name_back = opts.dataset_main_name_back, use_labels=opts.cond, xflip=opts.xflip, cache=opts.cache, 
-                                       corruption_probability=opts.corruption_probability, delta_probability=opts.delta_probability, mask_full_rgb=opts.mask_full_rgb,
-                                       corruption_pattern=opts.corruption_pattern, uncond_prob=opts.uncond_prob)
+                                        )
 
-    c.val_dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=opts.val_data, dataset_main_name = opts.val_dataset_main_name, dataset_main_name_cond = opts.val_dataset_main_name_cond, use_labels=opts.cond, xflip=opts.xflip, cache=opts.cache, 
-                                       corruption_probability=opts.corruption_probability, delta_probability=opts.delta_probability, mask_full_rgb=opts.mask_full_rgb,
-                                       corruption_pattern=opts.corruption_pattern, uncond_prob=opts.uncond_prob)
+
 
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=opts.workers, prefetch_factor=2)
     c.network_kwargs = dnnlib.EasyDict()
@@ -171,25 +168,10 @@ def main(**kwargs):
         c.network_kwargs.update(model_type='DhariwalUNet', model_channels=192, channel_mult=[1,2,3,4], gated=opts.gated)
 
     # Preconditioning & loss function.
-    if opts.precond == 'vp':
-        c.network_kwargs.class_name = 'training.networks.VPPrecond'
-        c.loss_kwargs.class_name = 'training.loss.VPLoss'
-    elif opts.precond == 've':
-        c.network_kwargs.class_name = 'training.networks.VEPrecond'
-        c.loss_kwargs.class_name = 'training.loss.VELoss'
-    elif opts.precond == 'edm':
-        c.network_kwargs.class_name = 'training.networks.EDMPrecond'
-        c.loss_kwargs.class_name = 'training.loss.EDMLoss'
-    elif opts.precond == 'ambient':
-        c.network_kwargs.class_name = 'training.networks.EDMPrecond'
-        c.loss_kwargs.class_name = 'training.loss.AmbientLoss'
-        c.loss_kwargs.norm = opts.norm
-    elif opts.precond == 'ambient_vp':
-        c.network_kwargs.class_name = 'training.networks.VPPrecond'
-        c.loss_kwargs.class_name = 'training.loss.AmbientVPLoss'
-        c.loss_kwargs.norm = opts.norm
-    else:
-        raise ValueError('Invalid precond method.')
+    c.network_kwargs.class_name = 'training.networks.EDMPrecond'
+    c.loss_kwargs.class_name = 'training.loss.ConditionalLoss'
+    c.loss_kwargs.norm = opts.norm
+    
         
     # Network options.
     if opts.cbase is not None:
@@ -232,9 +214,8 @@ def main(**kwargs):
         c.resume_state_dump = opts.resume
 
     # Description string.
-    cond_str = 'cond' if c.dataset_kwargs.use_labels else 'uncond'
     dtype_str = 'fp16' if c.network_kwargs.use_fp16 else 'fp32'
-    desc = f'{dataset_name:s}-{cond_str:s}-{opts.arch:s}-{opts.precond:s}-gpus{dist.get_world_size():d}-batch{c.batch_size:d}-{dtype_str:s}'
+    desc = f'{dataset_name:s}-{opts.arch:s}-{opts.precond:s}-gpus{dist.get_world_size():d}-batch{c.batch_size:d}-{dtype_str:s}'
     if opts.desc is not None:
         desc += f'-{opts.desc}'
 
@@ -268,10 +249,6 @@ def main(**kwargs):
     dist.print0(f'Mixed-precision:         {c.network_kwargs.use_fp16}')
     dist.print0()
 
-    # Dry run?
-    if opts.dry_run:
-        dist.print0('Dry run; exiting.')
-        return
 
     # Create output directory.
     dist.print0('Creating output directory...')

@@ -542,94 +542,10 @@ def tensor_clipping(x, static=True, p=0.99):
         s_val = s_val.reshape((-1, 1, 1, 1))
         return torch.clip(x, -s_val, s_val) / s_val
 
-def save_image(images, image_path):
-    image_np = (images * 127.5 + 128).clip(0, 255).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
-    if image_np.shape[2] == 1:
-        PIL.Image.fromarray(image_np[:, :, 0], 'L').save(image_path)
-    else:
-        PIL.Image.fromarray(image_np, 'RGB').save(image_path)
-
-
-def save_images(images, image_path, num_rows=None, num_cols=None):
-    if num_rows is None:
-        num_rows = int(np.sqrt(images.shape[0]))
-    if num_cols is None:
-        num_cols = int(np.ceil(images.shape[0] / num_rows))
-    
-    # TODO(giannisdaras): only works with square grids
-    image_np = (images * 127.5 + 128).clip(0, 255).to(torch.uint8).permute(0, 2, 3, 1).cpu().numpy()
-    image_size = images.shape[-2]
-    grid_image = PIL.Image.new('RGB', (num_cols * image_size, num_rows * image_size))
-    for i in range(num_rows):
-        for j in range(num_cols):
-            index = i * num_cols + j
-            img = PIL.Image.fromarray(image_np[index])
-            grid_image.paste(img, (i * image_size, j * image_size))
-    grid_image.save(image_path)
-
-
-def unroll_collage(x, num_rows):
-    """Unroll a collage of images into a batch of images.
-        Args:
-        :x (torch.Tensor): shape (3, width, height)
-        :num_rows (int): number of rows in the collage
-        Returns: 
-        :x (torch.Tensor): shape (num_rows**2, 3, width, height)
-    """
-    x = x.squeeze()
-    img_resolution = x.shape[-1] // num_rows
-    x = x.reshape(3, num_rows, img_resolution, num_rows, img_resolution)
-    x = x.permute(0, 1, 3, 2, 4).reshape(3, num_rows**2, img_resolution, img_resolution)
-    x = x.permute(1, 0, 2, 3)
-    return x
-
-
-def average_image(x, scale_factor):
-    down_scaled = F.interpolate(x, scale_factor=scale_factor, mode='area')
-    averaged = F.interpolate(down_scaled, size=(x.shape[2], x.shape[3]), mode='bilinear', align_corners=False)
-    return averaged
-
-
-def pooling_matrix(scale_factor, size):
-    pooling_size = int(size * scale_factor)
-    matrix = torch.zeros(size, pooling_size)
-    step = int(size // pooling_size)
-    
-    for i in range(pooling_size):
-        matrix[i*step:(i+1)*step, i] = 1/step
-        
-    return matrix
-
-def create_down_up_matrix(scale_factor, size):
-    down_matrix = pooling_matrix(scale_factor, size)
-    up_matrix = pooling_matrix(scale_factor, size).t()
-    down_up_matrix = down_matrix @ up_matrix
-    return down_up_matrix
-
-def linear_average(x, matrix):
-    _, channels, width, height = x.shape
-    x_flat = x.view(channels, width * height)
-    avg_flat = matrix.matmul(x_flat)
-    avg = avg_flat.view(channels, width, height)
-    return avg
-
-
-def sample_ratio(ratios=[1.0, 0.8, 0.6, 0.4, 0.2, 0.0], target_ratio=0.4, decay_exponent=8):
-    # Calculate the decayed distance of each ratio from the target
-    distances = [(abs(r - target_ratio) + 1)**decay_exponent for r in ratios]
-
-    # Compute the inverted probabilities and normalize them
-    probabilities = [1 / dist for dist in distances]
-    normalized_probabilities = [prob / sum(probabilities) for prob in probabilities]
-
-    # Generate the random number from the distribution
-    random_ratio = np.random.choice(ratios, p=normalized_probabilities)
-    return random_ratio
 
 
 
 
-    
 def load_image(image_path, device='cuda'):
     pil_image = PIL.Image.open(image_path)
     transform = transforms.Compose([

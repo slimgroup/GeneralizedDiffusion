@@ -25,37 +25,9 @@ import gc
 
 #----------------------------------------------------------------------------
 
-def evaluate_validation_set(ddp, val_loader, loss_fn, device, augment_pipe=None):
-    ddp.eval()
-    val_loss = 0
-    num_batches = 0
-    with torch.no_grad():
-        dataset_iter = next(val_loader)
-        images, labels, d = dataset_iter
-        #for images, labels, d in val_loader:
-        d = d.to(device).to(torch.float32)
-        images = images.to(device).to(torch.float32)
-        labels = labels.to(device)
-        
-        loss = loss_fn(net=ddp, images=images, labels=labels, augment_pipe=augment_pipe, d=d)
-        val_loss += loss.sum().item()
-
-        del d 
-        del images 
-        del labels 
-        torch.cuda.empty_cache() # also try inside of the no grad
-        gc.collect()
-        
-        #num_batches += 1
-    
-    #val_loss /= num_batches
-    ddp.train()
-    return val_loss
-
 def training_loop(
     run_dir             = '.',      # Output directory.
     dataset_kwargs      = {},       # Options for training set.
-    val_dataset_kwargs  = {},       # Options for validation set.
     data_loader_kwargs  = {},       # Options for torch.utils.data.DataLoader.
     network_kwargs      = {},       # Options for model and preconditioning.
     loss_kwargs         = {},       # Options for loss function.
@@ -108,8 +80,8 @@ def training_loop(
     # Construct network.
     dist.print0('Constructing network...')
     interface_kwargs = dict(img_resolution=dataset_obj.resolution, label_dim=dataset_obj.label_dim, img_channels=3 * dataset_obj.num_channels)
-    net = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
+    net = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
     net.train().requires_grad_(True).to(device)
 
@@ -121,7 +93,6 @@ def training_loop(
     net = torch.compile(net)
     ddp = torch.nn.parallel.DistributedDataParallel(net, device_ids=[device], broadcast_buffers=True)
     ema = copy.deepcopy(net).eval().requires_grad_(False)
-
 
     # Resume training from previous snapshot.
     if resume_pkl is not None:
@@ -165,13 +136,13 @@ def training_loop(
 
                 dataset_iter = next(dataset_iterator)
                 
-                images, labels, d = dataset_iter
+                images, cond = dataset_iter
 
-                d = d.to(device).to(torch.float32)
+                cond = cond.to(device).to(torch.float32)
                 images = images.to(device).to(torch.float32)
-                labels = labels.to(device)
+             
 
-                train_loss = loss_fn(net=ddp, images=images, labels=labels, augment_pipe=augment_pipe, d=d)
+                train_loss = loss_fn(net=ddp, images=images, cond=cond, augment_pipe=augment_pipe)
 
                 training_stats.report('Loss/loss_train', train_loss)
 

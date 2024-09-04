@@ -10,22 +10,11 @@
 import os
 import numpy as np
 import zipfile
-import PIL.Image
 import json
 import torch
 import dnnlib
-from torch_utils.ambient_diffusion import get_box_mask, get_patch_mask, get_hat_patch_mask, get_random_column_mask, get_well_mask, get_well_mask_from_existing
-from dnnlib.util import create_down_up_matrix, sample_ratio
-from scipy.signal import filtfilt
-import pylops
-from pylops.utils.wavelets import ricker
 import matplotlib.pyplot as plt
 import random
-
-try:
-    import pyspng
-except ImportError:
-    pyspng = None
 
 #----------------------------------------------------------------------------
 # Abstract base class for datasets.
@@ -42,16 +31,8 @@ class Dataset(torch.utils.data.Dataset):
         xflip       = False,    # Artificially double the size of the dataset via x-flips. Applied after max_size.
         random_seed = 0,        # Random seed to use when applying max_size.
         cache       = False,    # Cache images in CPU memory?
-        corruption_probability = 0.,   # Probability to corrupt a single image.
-        delta_probability = 0.,  # Probability to corrupt further an already corrupted image.
-        mask_full_rgb = False,
-        corruption_pattern = "dust",
-        ratios = [1.0, 0.8, 0.6, 0.4, 0.2, 0.1],  # potential downsampling ratios,
-        normalize=True,
-        uncond_prob = 0.1
     ):
-        assert corruption_pattern in ["dust", "box", "fixed_box", "keep_patch", "column", "column_random", "column_randomv2", "5well", "5well4", "5well2"], \
-            "corruption_pattern must be either 'dust', 'box', 'keep_patch', or 'fixed_box'"
+
         self._name = name
         self.dataset_main_name = dataset_main_name
         self.dataset_main_name_cond = dataset_main_name_cond
@@ -62,13 +43,6 @@ class Dataset(torch.utils.data.Dataset):
         self._cached_images = dict() # {raw_idx: np.ndarray, ...}
         self._raw_labels = None
         self._label_shape = None
-        self.corruption_probability = corruption_probability
-        self.delta_probability = delta_probability
-        self.mask_full_rgb = mask_full_rgb
-        self.corruption_pattern = corruption_pattern
-        self.ratios = ratios
-        self.normalize = normalize
-        self.uncond_prob = uncond_prob
 
         # Apply max_size.
         self._raw_idx = np.arange(self._raw_shape[0], dtype=np.int64)
@@ -118,27 +92,9 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
 
-        # raw_idx = self._raw_idx[idx]
-        # image = self._cached_images.get(raw_idx, None)
-        # if image is None:
-        #     image = self._load_raw_image(raw_idx)
-        #     if self._cache:
-        #         self._cached_images[raw_idx] = image
-        # print("Shape of Image Loaded")
-        # print("---------------------")
-        # print(image.shape)
-        # assert isinstance(image, np.ndarray)
-        # assert list(image.shape) == self.image_shape
-        # assert image.dtype == np.uint8
-        # if self._xflip[idx]:
-        #     assert image.ndim == 3 # CHW
-        #     image = image[:, :, ::-1]
-
         idx_str = str(idx).zfill(4)  # This will ensure the index is always 4 digits long
 
-        # load in 2d array 
         cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy')
-        #print(cond.shape)
         cond = torch.from_numpy(cond[np.newaxis,...]) / 10
 
         cond[0,0:16,:] = 0  
@@ -150,26 +106,10 @@ class Dataset(torch.utils.data.Dataset):
         #cond =tensor_cat(cond,backgrounddim=0)
         cond = torch.cat([cond, background], axis=0)
 
-
         target_image = np.load(f'{self.dataset_main_name}_{idx_str}.npy')
         target_image = torch.from_numpy(target_image[np.newaxis,...])  / 3.7
 
-        return target_image, self.get_label(idx), cond
-
-    def get_label(self, idx):
-        label = self._get_raw_labels()[self._raw_idx[idx]]
-        if label.dtype == np.int64:
-            onehot = np.zeros(self.label_shape, dtype=np.float32)
-            onehot[label] = 1
-            label = onehot
-        return label.copy()
-
-    def get_details(self, idx):
-        d = dnnlib.EasyDict()
-        d.raw_idx = int(self._raw_idx[idx])
-        d.xflip = (int(self._xflip[idx]) != 0)
-        d.raw_label = self._get_raw_labels()[d.raw_idx].copy()
-        return d
+        return target_image, cond
 
     @property
     def name(self):
@@ -187,7 +127,6 @@ class Dataset(torch.utils.data.Dataset):
     @property
     def resolution(self):
         assert len(self.image_shape) == 3 # CHW
-        #assert self.image_shape[1] == self.image_shape[2]
         return self.image_shape[1]
 
     @property
@@ -221,7 +160,7 @@ class ImageFolderDataset(Dataset):
     def __init__(self,
         path,                   # Path to directory or zip.
         resolution      = None, # Ensure specific resolution, None = highest available.
-        use_pyspng      = True, # Use pyspng if available?
+        use_pyspng      = False, # Use pyspng if available?
         **super_kwargs,         # Additional arguments for the Dataset base class.
     ):
         self._path = path
@@ -240,17 +179,13 @@ class ImageFolderDataset(Dataset):
             # print("Neither zip or directory")
             raise IOError('Path must point to a directory or zip')
 
-        # PIL.Image.init()
-        #self._image_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in PIL.Image.EXTENSION)
         self._image_fnames = sorted(fname for fname in self._all_fnames if os.path.splitext(fname)[1] == '.npy')
-        # print(self._image_fnames)
         if len(self._image_fnames) == 0:
             raise IOError('No image files found in the specified path')
 
         name = os.path.splitext(os.path.basename(self._path))[0]
         raw_shape = [len(self._image_fnames)] + list(self._load_raw_image(0).shape)
         if resolution is not None and (raw_shape[2] != resolution):
-        #if resolution is not None and (raw_shape[3] != resolution):
             raise IOError('Image files do not match the specified resolution')
         super().__init__(name=name, raw_shape=raw_shape, **super_kwargs)
 
