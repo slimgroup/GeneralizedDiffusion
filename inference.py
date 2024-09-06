@@ -7,11 +7,9 @@ import numpy as np
 import torch
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from dnnlib.util import print_tensor_stats, save_images
 from torch_utils import distributed as dist
 import dnnlib
 from training import dataset
-#from torch_utils.misc import parse_int_list
 from torch_utils.misc import StackedRandomGenerator
 import json
 from collections import OrderedDict
@@ -29,22 +27,10 @@ def ambient_sampler(
     num_steps=10, sigma_min=0.1, sigma_max=80, rho=7,
     S_churn=0.0, S_min=0.0, S_max=float('inf'), S_noise=10,
     cond_loc = "",
-    image_dir = ""
-
-):
-    d_tensor = np.load(cond_loc)
-    d_tensor = torch.from_numpy(d_tensor) / 10
-    d_tensor_repeated = d_tensor.repeat(1,1,1,1).to((device))
-
-    d_tensor_repeated[0,0,0:16,:] = 0
-
-    a = np.quantile(np.absolute(d_tensor_repeated.cpu()),0.98)
-    plt.figure(); plt.title("RTM")
-    plt.imshow(d_tensor_repeated[0,0,:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
-    plt.axis("off")
-    cb = plt.colorbar(fraction=0.0235, pad=0.04); 
-    plt.savefig(os.path.join(image_dir, "actual_condition.png"),bbox_inches = "tight",dpi=300)
-       
+    image_dir = "",
+    cond=None
+    ):
+   
     # Time step discretization.
     step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
     t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
@@ -62,23 +48,22 @@ def ambient_sampler(
             x_hat = x_cur + (t_hat ** 2 - t_cur ** 2).sqrt() * S_noise * randn_like(x_cur)
 
             # Euler step.
-            net_input = torch.cat([x_next, d_tensor_repeated], dim=1)
-            denoised = net(net_input, t_hat, class_labels).to(torch.float64)[:, :1]
+            net_input = torch.cat([x_next, cond], dim=1)
+            denoised = net(net_input, t_hat).to(torch.float64)[:, :1]
             d_cur = (x_hat - denoised) / t_hat
             x_next = x_hat + (t_next - t_hat) * d_cur
 
             # Apply 2nd order correction.
             if i < num_steps - 1:
-                net_input = torch.cat([x_next, d_tensor_repeated], dim=1)
-                denoised = net(net_input, t_next, class_labels).to(torch.float64)[:, :1]
+                net_input = torch.cat([x_next, cond], dim=1)
+                denoised = net(net_input, t_next).to(torch.float64)[:, :1]
                 d_prime = (x_next - denoised) / t_next
                 x_next = x_hat + (t_next - t_hat) * (0.5 * d_cur + 0.5 * d_prime)
 
     return x_next
 
-def main(network_loc, training_options_loc, outdir, subdirs, seeds, num_steps,class_idx, max_batch_size, 
-         experiment_name, ref_path, num_generate, seed, num_classes, cond_loc, vel_loc,
-         device=torch.device('cuda'),  **sampler_kwargs):
+def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
+         num_generate,  cond_loc, gt_loc, device=torch.device('cuda'),  **sampler_kwargs):
 
     torch.multiprocessing.set_start_method('spawn')
     dist.init()
@@ -151,29 +136,29 @@ def main(network_loc, training_options_loc, outdir, subdirs, seeds, num_steps,cl
 
         #pdb.set_trace()
 
-        image_dir = os.path.join(outdir, str(checkpoint_number) + "/" + rtm_loc[-12:-4])
+        image_dir = os.path.join(outdir, str(checkpoint_number) + "/" + cond_loc[-12:-4])
         os.makedirs(image_dir, exist_ok=True)
 
-        # cond     = np.load(rtm_loc)  / 10
-        # cond = torch.from_numpy(cond[np.newaxis,...]) 
-        # print(cond.shape)
-        # cond[0,0:20,:] = 0 
-        
-        # a = np.quantile(np.absolute(cond),0.98)
-        # plt.figure(); plt.title("RTM")
-        # plt.imshow(cond[0,:,:], vmin=-a,vmax=a, cmap = "gray")
-        # cb = plt.colorbar(fraction=0.0235, pad=0.04);
-        # plt.axis("off")
-        # plt.savefig(os.path.join(image_dir, "rtm.png"),bbox_inches = "tight",dpi=300)
+        cond = np.load(cond_loc)
+        cond = torch.from_numpy(cond) 
+        cond = cond.repeat(1,1,1,1).to((device))
 
-        fac_mult = 3.7
-        velocity = np.load(vel_loc) 
+        cond[0,0,0:16,:] = 0
+       
+        a = np.quantile(np.absolute(cond.cpu()),0.98)
+        plt.figure(); plt.title("Condition")
+        plt.imshow(cond[0,0,:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
+        plt.axis("off")
+        cb = plt.colorbar(fraction=0.0235, pad=0.04); 
+        plt.savefig(os.path.join(image_dir, "actual_condition.png"),bbox_inches = "tight",dpi=300)
+
+        gt = np.load(gt_loc) 
         vmin_gt = 1.5
         vmax_gt = 3.7#4.5
         cmap_gt = cc.cm['rainbow4']
 
         plt.figure();  plt.title("Ground truth")
-        plt.imshow(velocity, vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
+        plt.imshow(gt, vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
         plt.axis("off")
         cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
         plt.savefig(os.path.join(image_dir, "original_velocity.png"),bbox_inches = "tight",dpi=300)
@@ -185,7 +170,7 @@ def main(network_loc, training_options_loc, outdir, subdirs, seeds, num_steps,cl
         # Loop over batches.
         dist.print0(f'Generating {len(seeds)} images to "{outdir}"...')
         batch_count = 1
-        images_np_stack = np.zeros((len(seeds),1,*velocity.shape))
+        images_np_stack = np.zeros((len(seeds),1,*gt.shape))
         for batch_seeds in tqdm.tqdm(rank_batches, disable=dist.get_rank() != 0):
             dist.print0(f"Waiting for the green light to start generation for {batch_count}/{batches_per_process}")
             # don't move to the next batch until all nodes have finished their current batch
@@ -197,66 +182,51 @@ def main(network_loc, training_options_loc, outdir, subdirs, seeds, num_steps,cl
 
             # Pick latents and labels.
             rnd = StackedRandomGenerator(device, batch_seeds)
-            latents = rnd.randn([batch_size, 1, velocity.shape[0], velocity.shape[1]], device=device)
+            latents = rnd.randn([batch_size, 1, gt.shape[0], gt.shape[1]], device=device)
            
             # Generate images.
             sampler_kwargs = {key: value for key, value in sampler_kwargs.items() if value is not None}
             images = ambient_sampler(net, latents,num_steps=num_steps, randn_like=rnd.randn_like,
-                cond_loc = cond_loc, image_dir=image_dir, **sampler_kwargs)
+                cond=cond, image_dir=image_dir, **sampler_kwargs)
             
             # Save Images
             images_np = images.cpu().detach().numpy()
             for seed, one_image in zip(batch_seeds, images_np):
-                image_dir = os.path.join(outdir, str(checkpoint_number) + "/" + rtm_loc[-12:-4])
                 dist.print0(f"Saving loc: {image_dir}")
                 os.makedirs(image_dir, exist_ok=True)
-                image_path = os.path.join(image_dir, "t_"+str(num_steps)+"_"+f'{seed:06d}.png')
+                image_path = os.path.join(image_dir, "steps_"+str(num_steps)+"_"+f'{seed:04d}.png')
 
                 plt.figure(); plt.title("Posterior Sample")
-                plt.imshow(fac_mult*one_image[0, :, :],   vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
+                plt.imshow(one_image[0, :, :],   vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
                 plt.axis("off")
                 cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
                 plt.savefig(image_path, bbox_inches = "tight",dpi=300)
                 plt.close()
                 os.makedirs(os.path.join(image_dir, f'saved/'), exist_ok=True)
                 np.save(os.path.join(image_dir, f'saved/{seed:06d}')+ ".npy", one_image[0, :, :])
-            images_np_stack[batch_count-1,0,:,:] = fac_mult*one_image
+            images_np_stack[batch_count-1,0,:,:] = one_image
             batch_count += 1
 
            # plot posterior statistics
         post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
-        ssim_t = ssim(velocity,post_mean, data_range=np.max(velocity) - np.min(velocity))
-
-        trace_ind = 128 
-        plt.figure(figsize=(10,4)); plt.title("Trace at "+str(trace_ind))
-        plt.plot(images_np_stack[1,0,:,trace_ind], linewidth=0.8, color="red", linestyle="--", label="Posterior sample")
-        plt.plot(images_np_stack[2,0,:,trace_ind], linewidth=0.8,color="red", linestyle="--", label="Posterior sample")
-        plt.plot(images_np_stack[3,0,:,trace_ind], linewidth=0.8,color="red", linestyle="--", label="Posterior sample")
-        plt.plot(post_mean[:,trace_ind], linewidth=0.8,color="black", linestyle="--", label="Posterior mean")
-        plt.plot(velocity[:,trace_ind], linewidth=0.8,color="black", label="Ground truth ")
-        plt.ylabel("Km/s")
-        plt.xlabel("Depth grid point")
-        plt.legend()
-        plt.savefig(os.path.join(image_dir, "t_"+str(num_steps)+"_p"+str(num_generate)+"_trace.png"),bbox_inches = "tight",dpi=300); plt.close()
-
-    
+        ssim_t = ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
 
         plt.figure(); plt.title("Posterior mean SSIM:"+str(round(ssim_t,4)))
         plt.imshow(post_mean,  vmin=vmin_gt,vmax=vmax_gt,   cmap = cmap_gt)
         plt.axis("off"); 
         cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
-        plt.savefig(os.path.join(image_dir, "t_"+str(num_steps)+"_p"+str(num_generate)+"_mean.png"),bbox_inches = "tight",dpi=300); plt.close()
+        plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_mean.png"),bbox_inches = "tight",dpi=300); plt.close()
 
         plt.figure(); plt.title("Stdev")
-        plt.imshow(2*np.std(images_np_stack,axis=0)[0,:,:],  vmin=0, vmax=0.5,   cmap = "magma")
+        plt.imshow(np.std(images_np_stack,axis=0)[0,:,:],  vmin=0, vmax=None,   cmap = "magma")
         plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
-        plt.savefig(os.path.join(image_dir, "t_"+str(num_steps)+"_p"+str(num_generate)+"std.png"),bbox_inches = "tight",dpi=300); plt.close()
+        plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"std.png"),bbox_inches = "tight",dpi=300); plt.close()
             
-        rmse_t = np.sqrt(mean_squared_error(velocity, post_mean))
+        rmse_t = np.sqrt(mean_squared_error(gt, post_mean))
         plt.figure(); plt.title("Error RMSE:"+str(round(rmse_t,4)))
-        plt.imshow(np.abs(post_mean-velocity), vmin=0, vmax=0.5, cmap = "magma")
+        plt.imshow(np.abs(post_mean-gt), vmin=0, vmax=None, cmap = "magma")
         plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
-        plt.savefig(os.path.join(image_dir, "t_"+str(num_steps)+"_p"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
+        plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
 
         dist.print0(f"Node finished generation for {checkpoint_number}")
         dist.print0("waiting for others to finish..")
@@ -269,17 +239,9 @@ def main(network_loc, training_options_loc, outdir, subdirs, seeds, num_steps,cl
 if __name__ == "__main__":
    
     seeds = [i for i in range(0, 100)]
-    subdirs = True
-    class_idx = None
-    batch = 1
-    guidance_scale = 0.0
-    wandb_id = ''
-    ref_path = ""
-    num_generate = 16
-    seed = 0
-
+    max_batch_size = 1
+    num_generate = 2
     num_steps = 10
-
 
     device = torch.device('cuda')
     #device = torch.device('cpu')
@@ -297,9 +259,6 @@ if __name__ == "__main__":
     training_options_loc = network_loc+"/training_options.json"
     outdir = "sampling/"
 
-    main(network_loc, training_options_loc, outdir, subdirs, seeds,num_steps=num_steps, class_idx, batch, 
-        # Ambient Diffusion Params
-        corruption_probability, delta_probability, num_masks, guidance_scale, mask_full_rgb,
-        # other params
-        experiment_name, ref_path, num_generate, seed, num_classes, cond_loc, vel_loc, device)
+    main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
+         num_generate,  cond_loc, vel_loc, device)
     
