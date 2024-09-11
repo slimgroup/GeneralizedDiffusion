@@ -48,7 +48,7 @@ def ambient_sampler(
             x_hat = x_cur + (t_hat ** 2 - t_cur ** 2).sqrt() * S_noise * randn_like(x_cur)
 
             # Euler step.
-            net_input = torch.cat([x_next, cond], dim=1)
+            net_input = torch.cat([x_hat, cond], dim=1)
             denoised = net(net_input, t_hat).to(torch.float64)[:, :1]
             d_cur = (x_hat - denoised) / t_hat
             x_next = x_hat + (t_next - t_hat) * d_cur
