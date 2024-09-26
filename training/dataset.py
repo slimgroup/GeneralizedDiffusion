@@ -15,6 +15,7 @@ import torch
 import dnnlib
 import matplotlib.pyplot as plt
 import random
+import pdb
 
 #----------------------------------------------------------------------------
 # Abstract base class for datasets.
@@ -28,11 +29,13 @@ class Dataset(torch.utils.data.Dataset):
         raw_shape,              # Shape of the raw image data (NCHW).
         cond_norm=1,
         gt_norm=1,
+        use_offsets=False,
         max_size    = None,     # Artificially limit the size of the dataset. None = no limit. Applied before xflip.
         use_labels  = False,    # Enable conditioning labels? False = label dimension is zero.
         xflip       = False,    # Artificially double the size of the dataset via x-flips. Applied after max_size.
         random_seed = 0,        # Random seed to use when applying max_size.
         cache       = False,    # Cache images in CPU memory?
+
     ):
 
         self._name = name
@@ -41,6 +44,8 @@ class Dataset(torch.utils.data.Dataset):
         self.dataset_main_name_back = dataset_main_name_back
         self.cond_norm = cond_norm
         self.gt_norm = gt_norm
+        #self.num_offsets = num_offsets
+        self.use_offsets = use_offsets
         self._raw_shape = list(raw_shape)
         self._use_labels = use_labels
         self._cache = cache
@@ -95,8 +100,21 @@ class Dataset(torch.utils.data.Dataset):
 
         idx_str = str(idx).zfill(4)  # This will ensure the index is always 4 digits long
 
-        cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy')
-        cond = cond[np.newaxis,...] / self.cond_norm
+        cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy') / self.cond_norm
+        if not self.use_offsets:
+            print("use only zero offset")
+            cond = cond[12,:,:]
+            cond = cond[np.newaxis,...]
+        #print(cond[1,100,100])
+        #print(cond[10,100,100])
+
+        #pdb.set_trace()
+
+        #print(cond.shape)
+
+        #cond = cond[12-self.num_offsets:12+self.num_offsets+1,:,:] / self.cond_norm
+        #print(cond.shape)
+        #    / self.num_offsets
 
         #load in background model 
         background = np.load(f'{self.dataset_main_name_back}_{idx_str}.npy')

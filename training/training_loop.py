@@ -76,10 +76,16 @@ def training_loop(
     dataset_sampler = misc.InfiniteSampler(dataset=dataset_obj, rank=dist.get_rank(), num_replicas=dist.get_world_size(), seed=seed)
     dataset_iterator = iter(torch.utils.data.DataLoader(dataset=dataset_obj, sampler=dataset_sampler, batch_size=batch_gpu, **data_loader_kwargs))
 
+    #get condition to get number of channels 
+    dataset_iter = next(dataset_iterator)
+    images, cond = dataset_iter
+    print("Condition has this number of channels:")
+    print(cond.shape[1])
+    num_chan_total = images.shape[1] + cond.shape[1]
 
     # Construct network.
     dist.print0('Constructing network...')
-    interface_kwargs = dict(img_resolution=dataset_obj.resolution, label_dim=dataset_obj.label_dim, img_channels=3 * dataset_obj.num_channels)
+    interface_kwargs = dict(img_resolution=dataset_obj.resolution, label_dim=dataset_obj.label_dim, img_channels=num_chan_total)
     net = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
     net.train().requires_grad_(True).to(device)

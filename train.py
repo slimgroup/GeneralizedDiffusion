@@ -48,6 +48,11 @@ def parse_int_list(s):
 @click.option('--dataset_main_name_cond', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
 @click.option('--dataset_main_name_back', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
 
+@click.option('--num_offsets',     help='number of offsets in positive and negative so must be multiplied by two for total non-zero offsets.', metavar='INT',   type=click.IntRange(min=0), default=0)
+@click.option('--num_offsets',     help='number of offsets in positive and negative so must be multiplied by two for total non-zero offsets.', metavar='INT',   type=click.IntRange(min=0), default=0)
+@click.option('--use_offsets',         help='Enable offsets', metavar='BOOL',                     type=bool, default=False, show_default=True)
+
+
 @click.option('--cond_norm',       help='cond_norm', metavar='FLOAT',                       type=click.FloatRange(min=0), default=1.0, show_default=True)
 @click.option('--gt_norm',       help='gt_norm', metavar='FLOAT',                       type=click.FloatRange(min=0), default=1.0, show_default=True)
 
@@ -101,13 +106,11 @@ def main(**kwargs):
     torch.multiprocessing.set_start_method('spawn')
     dist.init()
 
-    if dist.get_rank() == 0:
-        wandb.init(project=opts.project_name,config=kwargs,name=opts.experiment_name)
-        
+       
     # Initialize config dict.
     c = dnnlib.EasyDict()
     c.update(max_grad_norm=opts.max_grad_norm)
-    c.dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=opts.data, dataset_main_name = opts.dataset_main_name,dataset_main_name_cond = opts.dataset_main_name_cond,dataset_main_name_back = opts.dataset_main_name_back,cond_norm = opts.cond_norm,gt_norm = opts.gt_norm, xflip=opts.xflip, cache=opts.cache,                                 )
+    c.dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=opts.data, dataset_main_name = opts.dataset_main_name,dataset_main_name_cond = opts.dataset_main_name_cond,dataset_main_name_back = opts.dataset_main_name_back,cond_norm = opts.cond_norm,gt_norm = opts.gt_norm, use_offsets = opts.use_offsets, xflip=opts.xflip, cache=opts.cache,                                 )
 
 
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=opts.workers, prefetch_factor=2)
@@ -167,9 +170,14 @@ def main(**kwargs):
 
     # Description string.
     dtype_str = 'fp16' if c.network_kwargs.use_fp16 else 'fp32'
-    desc = f'{opts.experiment_name:s}-gpus{dist.get_world_size():d}-batch{c.batch_size:d}-{dtype_str:s}'
+    desc = f'gpus{dist.get_world_size():d}-batch{c.batch_size:d}'
     if opts.desc is not None:
         desc += f'-{opts.desc}'
+    desc += f'-offsets{opts.use_offsets}'
+
+    if dist.get_rank() == 0:
+        wandb.init(project=opts.project_name,config=kwargs,name=desc)
+   
 
     # Pick output directory.
     if dist.get_rank() != 0:
