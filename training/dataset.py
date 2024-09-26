@@ -26,6 +26,8 @@ class Dataset(torch.utils.data.Dataset):
         dataset_main_name_cond,
         dataset_main_name_back,
         raw_shape,              # Shape of the raw image data (NCHW).
+        cond_norm=1,
+        gt_norm=1,
         max_size    = None,     # Artificially limit the size of the dataset. None = no limit. Applied before xflip.
         use_labels  = False,    # Enable conditioning labels? False = label dimension is zero.
         xflip       = False,    # Artificially double the size of the dataset via x-flips. Applied after max_size.
@@ -36,6 +38,9 @@ class Dataset(torch.utils.data.Dataset):
         self._name = name
         self.dataset_main_name = dataset_main_name
         self.dataset_main_name_cond = dataset_main_name_cond
+        self.dataset_main_name_back = dataset_main_name_back
+        self.cond_norm = cond_norm
+        self.gt_norm = gt_norm
         self._raw_shape = list(raw_shape)
         self._use_labels = use_labels
         self._cache = cache
@@ -50,10 +55,7 @@ class Dataset(torch.utils.data.Dataset):
             self._raw_idx = np.sort(self._raw_idx[:max_size])
 
         # Apply xflip.
-        self._xflip = np.zeros(self._raw_idx.size, dtype=np.uint8)
-        if xflip:
-            self._raw_idx = np.tile(self._raw_idx, 2)
-            self._xflip = np.concatenate([self._xflip, np.ones_like(self._xflip)])
+        self.xflip = xflip
 
     def _get_raw_labels(self):
         if self._raw_labels is None:
@@ -94,21 +96,29 @@ class Dataset(torch.utils.data.Dataset):
         idx_str = str(idx).zfill(4)  # This will ensure the index is always 4 digits long
 
         cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy')
-        cond = torch.from_numpy(cond[np.newaxis,...]) / 10
-
-        cond[0,0:16,:] = 0  
+        cond = cond[np.newaxis,...] / self.cond_norm
 
         #load in background model 
         background = np.load(f'{self.dataset_main_name_back}_{idx_str}.npy')
-        background = torch.from_numpy(background[np.newaxis,...])  / 3.7
+        background = background[np.newaxis,...]  / self.gt_norm
 
-        #cond =tensor_cat(cond,backgrounddim=0)
-        cond = torch.cat([cond, background], axis=0)
+        #cond = torch.cat([cond, background], axis=0)
+        cond = np.concatenate([cond, background], axis=0)
 
         target_image = np.load(f'{self.dataset_main_name}_{idx_str}.npy')
-        target_image = torch.from_numpy(target_image[np.newaxis,...])  / 3.7
+        target_image = target_image[np.newaxis,...]  / self.gt_norm
 
-        return target_image, cond
+        if self.xflip:
+            rand_num = np.random.uniform()
+            if rand_num > 0.5:
+                if target_image.shape[-1] > 0:
+                    target_image = np.flip(target_image, 2)
+                if cond.shape[-1] > 0:
+                    cond = np.flip(cond, 2)
+
+        #need the copy if you have the flip
+        return torch.from_numpy(target_image.copy()), torch.from_numpy(cond.copy())
+
 
     @property
     def name(self):

@@ -5,7 +5,6 @@
 # You should have received a copy of the license along with this
 # work. If not, see http://creativecommons.org/licenses/by-nc-sa/4.0/
 
-# Train 5 well and real RTMs
 import os
 import re
 import json
@@ -45,18 +44,14 @@ def parse_int_list(s):
 # Main options.
 @click.option('--outdir',        help='Where to save the results', metavar='DIR',                   type=str, default="")
 @click.option('--data',          help='Path to the dataset', metavar='ZIP|DIR',                     type=str, default = "")
-@click.option('--val_data',          help='Path to the dataset', metavar='ZIP|DIR',                     type=str, default = "")#"images/" #default="datasets/shuffled_resized_1040_vel_dataset_256x256.zip")
 @click.option('--dataset_main_name', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
 @click.option('--dataset_main_name_cond', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
 @click.option('--dataset_main_name_back', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
 
-@click.option('--val_dataset_main_name', help='Path to the dataset validation folder', metavar='ZIP|DIR',     type=str, default = "")
-@click.option('--val_dataset_main_name_cond', help='Path to the dataset validation folder', metavar='ZIP|DIR',     type=str, default = "")
+@click.option('--cond_norm',       help='cond_norm', metavar='FLOAT',                       type=click.FloatRange(min=0), default=1.0, show_default=True)
+@click.option('--gt_norm',       help='gt_norm', metavar='FLOAT',                       type=click.FloatRange(min=0), default=1.0, show_default=True)
 
 @click.option('--cond',          help='Train class-conditional model', metavar='BOOL',              type=bool, default=False, show_default=True) 
-@click.option('--arch',          help='Network architecture', metavar='ddpmpp|ncsnpp|adm',          type=click.Choice(['ddpmpp', 'ncsnpp', 'adm','ddpmpp_mask']), default='ddpmpp', show_default=True)
-@click.option('--precond',       help='Preconditioning & loss function', metavar='vp|ve|edm|ambient',       type=click.Choice(['vp', 've', 'edm', 'ambient']), default='ambient', show_default=True)
-@click.option('--uncond_prob',   help='Unconditional model probablility', metavar='MIMG',           type=click.FloatRange(min=0), default=0.0, show_default=True)
 
 # Hyperparameters.
 @click.option('--duration',      help='Training duration', metavar='MIMG',                          type=click.FloatRange(min=0), default=200, show_default=True)
@@ -71,21 +66,9 @@ def parse_int_list(s):
 @click.option('--max_grad_norm', help='Max norm for gradients.', metavar='FLOAT', type=click.FloatRange(min=0), default=1.0, show_default=True)
 @click.option('--weight_decay', help='Value of weight decay. Set to 0. to disable.', metavar='FLOAT', type=click.FloatRange(min=0), default=0., show_default=True)
 
-# Stochastic Sampling
-@click.option('--S_churn',  help='Amount of stochasticity', metavar='S_churn', type=click.FloatRange(min=0, max=float('inf')), default=10.0, show_default=True)
-@click.option('--S_min',  help='Saturation lower bound', metavar='S_min', type=click.FloatRange(min=0, max=1), default=0.01, show_default=True)
-@click.option('--S_max',  help='Saturation upper bound', metavar='S_max', type=click.FloatRange(min=0, max=1), default=1.0, show_default=True)
-@click.option('--S_noise',  help='S_noise', metavar='S_noise', type=click.FloatRange(min=0, max=float('inf')), default=1.007, show_default=True)
-
-
 # Ambient diffusion
-@click.option('--corruption_probability', help='Probability of corrupting a single pixel from the dataset', metavar='FLOAT', default=0.0, show_default=True)
-@click.option('--delta_probability', help='Probability of corrupting a pixel that survived', metavar='FLOAT', default=0.0, show_default=True)
-@click.option('--mask_full_rgb', help='Whether to mask all the RGB channels together', metavar='BOOL', default=False, show_default=True)
 @click.option('--norm', help='Norm for loss', default=2, show_default=True)
 @click.option('--gated', help='Whether to use gated convolutions', metavar='BOOL', default=True, show_default=True)
-@click.option('--corruption_pattern', help='Corruption pattern', metavar='dust|box|downscale|fixed_box|column|column_random|5well', default='5well', show_default=True, required=False)
-@click.option('--max_size', help='Limit training samples.', type=int, default=None, show_default=True)
 
 @click.option('--xflip',         help='Enable dataset x-flips', metavar='BOOL',                     type=bool, default=False, show_default=True)
 
@@ -124,9 +107,7 @@ def main(**kwargs):
     # Initialize config dict.
     c = dnnlib.EasyDict()
     c.update(max_grad_norm=opts.max_grad_norm)
-    c.dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=opts.data, dataset_main_name = opts.dataset_main_name,dataset_main_name_cond = opts.dataset_main_name_cond,dataset_main_name_back = opts.dataset_main_name_back, use_labels=opts.cond, xflip=opts.xflip, cache=opts.cache, 
-                                        )
-
+    c.dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=opts.data, dataset_main_name = opts.dataset_main_name,dataset_main_name_cond = opts.dataset_main_name_cond,dataset_main_name_back = opts.dataset_main_name_back,cond_norm = opts.cond_norm,gt_norm = opts.gt_norm, xflip=opts.xflip, cache=opts.cache,                                 )
 
 
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=opts.workers, prefetch_factor=2)
@@ -138,50 +119,21 @@ def main(**kwargs):
     else:
         c.optimizer_kwargs = dnnlib.EasyDict(class_name='torch.optim.AdamW', lr=opts.lr, betas=[0.9,0.999], eps=1e-8, weight_decay=opts.weight_decay)
 
-    # Validate dataset options.
-    try:
-        dataset_obj = dnnlib.util.construct_class_by_name(**c.dataset_kwargs)
-        dataset_name = dataset_obj.name
-        c.dataset_kwargs.resolution = dataset_obj.resolution # be explicit about dataset resolution
-        if opts.max_size is None:
-            c.dataset_kwargs.max_size = len(dataset_obj) # be explicit about dataset size
-        else:
-            c.dataset_kwargs.max_size = min(len(dataset_obj), opts.max_size)
-        if opts.cond and not dataset_obj.has_labels:
-            raise click.ClickException('--cond=True requires labels specified in dataset.json')
-        del dataset_obj # conserve memory
-    except IOError as err:
-        raise click.ClickException(f'--data: {err}')
-
     # Network architecture.
-    if opts.arch == 'ddpmpp':
-        c.network_kwargs.update(model_type='SongUNet', embedding_type='positional', encoder_type='standard', decoder_type='standard')
-        c.network_kwargs.update(channel_mult_noise=1, resample_filter=[1,1], model_channels=64, channel_mult=[2,2,2], gated=opts.gated)
-    elif opts.arch == 'ncsnpp':
-        c.network_kwargs.update(model_type='SongUNet', embedding_type='fourier', encoder_type='residual', decoder_type='standard')
-        c.network_kwargs.update(channel_mult_noise=2, resample_filter=[1,3,3,1], model_channels=128, channel_mult=[2,2,2], gated=opts.gated)
-    elif opts.arch == 'ddpmpp_mask':
-        c.network_kwargs.update(model_type='SongUNet_mask', embedding_type='positional', encoder_type='standard', decoder_type='standard')
-        c.network_kwargs.update(channel_mult_noise=1, resample_filter=[1,1], model_channels=64, channel_mult=[2,2,2], gated=opts.gated)
-    else:
-        assert opts.arch == 'adm'
-        c.network_kwargs.update(model_type='DhariwalUNet', model_channels=192, channel_mult=[1,2,3,4], gated=opts.gated)
-
+    c.network_kwargs.update(model_type='SongUNet', embedding_type='positional', encoder_type='standard', decoder_type='standard')
+    c.network_kwargs.update(channel_mult_noise=1, resample_filter=[1,1], model_channels=64, channel_mult=[2,2,2], gated=opts.gated)
+   
     # Preconditioning & loss function.
     c.network_kwargs.class_name = 'training.networks.EDMPrecond'
     c.loss_kwargs.class_name = 'training.loss.ConditionalLoss'
     c.loss_kwargs.norm = opts.norm
     
-        
     # Network options.
     if opts.cbase is not None:
         c.network_kwargs.model_channels = opts.cbase
     if opts.cres is not None:
         c.network_kwargs.channel_mult = opts.cres
-    # if opts.augment > 0:
-    #     c.augment_kwargs = dnnlib.EasyDict(class_name='training.augment.AugmentPipe', p=opts.augment)
-    #     c.augment_kwargs.update(xflip=1e8, yflip=1, scale=1, rotate_frac=1, aniso=1, translate_frac=1)
-    #     c.network_kwargs.augment_dim = 9
+
     c.network_kwargs.update(dropout=opts.dropout, use_fp16=opts.fp16)
 
     # Training options.
@@ -215,7 +167,7 @@ def main(**kwargs):
 
     # Description string.
     dtype_str = 'fp16' if c.network_kwargs.use_fp16 else 'fp32'
-    desc = f'{dataset_name:s}-{opts.arch:s}-{opts.precond:s}-gpus{dist.get_world_size():d}-batch{c.batch_size:d}-{dtype_str:s}'
+    desc = f'{opts.experiment_name:s}-gpus{dist.get_world_size():d}-batch{c.batch_size:d}-{dtype_str:s}'
     if opts.desc is not None:
         desc += f'-{opts.desc}'
 
@@ -241,9 +193,6 @@ def main(**kwargs):
     dist.print0()
     dist.print0(f'Output directory:        {c.run_dir}')
     dist.print0(f'Dataset path:            {c.dataset_kwargs.path}')
-    dist.print0(f'Class-conditional:       {c.dataset_kwargs.use_labels}')
-    dist.print0(f'Network architecture:    {opts.arch}')
-    dist.print0(f'Preconditioning & loss:  {opts.precond}')
     dist.print0(f'Number of GPUs:          {dist.get_world_size()}')
     dist.print0(f'Batch size:              {c.batch_size}')
     dist.print0(f'Mixed-precision:         {c.network_kwargs.use_fp16}')
