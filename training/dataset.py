@@ -36,7 +36,6 @@ class Dataset(torch.utils.data.Dataset):
         self._name = name
         self.dataset_main_name = dataset_main_name
         self.dataset_main_name_cond = dataset_main_name_cond
-        self.dataset_main_name_back = dataset_main_name_back
         self._raw_shape = list(raw_shape)
         self._use_labels = use_labels
         self._cache = cache
