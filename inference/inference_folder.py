@@ -66,28 +66,20 @@ def ambient_sampler(
 def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
          num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets, device=torch.device('cuda'),  **sampler_kwargs):
 
-    #torch.multiprocessing.set_start_method('spawn')
-    #dist.init()
-
     # we want to make sure that each gpu does not get more than batch size.
     # Hence, the following measures how many batches are going to be per GPU.
     seeds = seeds[:num_generate]
     num_batches = ((len(seeds) - 1) // (max_batch_size * 1) + 1) *1
     print(num_batches)
     #dist.print0(f"The algorithm will run for {num_batches} batches --  {len(seeds)} images of batch size {max_batch_size}")
-    all_batches = torch.as_tensor(seeds).tensor_split(num_batches)
+    rank_batches = torch.as_tensor(seeds).tensor_split(num_batches)
     # the following has for each batch size allocated to this GPU, the indexes of the corresponding images.
-    rank_batches = all_batches#[1 :: 1]
-    #batches_per_process = len(rank_batches)
-    #dist.print0(f"This process will get {len(rank_batches)} batches.")
 
     # load training options
-    #with dnnlib.util.open_url(training_options_loc, verbose=(dist.get_rank() == 0)) as f:
     with dnnlib.util.open_url(training_options_loc, verbose=(True)) as f:
         training_options = json.load(f)
 
     label_dim = 0
-
 
     #load in condition
     files_cond = dnnlib.util.list_dir(cond_base)
@@ -125,14 +117,10 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     checkpoint_numbers = np.array(checkpoint_numbers)
     
     for checkpoint_number, checkpoint in zip(checkpoint_numbers, sorted_pkl_files):
-        # Rank 0 goes first.
-        #if dist.get_rank() != 0:
-        #    torch.distributed.barrier()
 
         network_pkl = os.path.join(network_loc, f'network-snapshot-{checkpoint_number:06d}.pkl')
         # Load network.
         #dist.print0(f'Loading network from "{network_pkl}"...')
-        #with dnnlib.util.open_url(network_pkl, verbose=(dist.get_rank() == 0)) as f:
         with dnnlib.util.open_url(network_pkl, verbose=True) as f:
             loaded_obj = pickle.load(f)['ema']
         
@@ -210,20 +198,12 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
             plt.savefig(os.path.join(image_dir, "original_velocity.png"),bbox_inches = "tight",dpi=300)
 
-            # Other ranks follow.
-            #if dist.get_rank() == 0:
-            #    torch.distributed.barrier()
 
             # Loop over batches.
             #dist.print0(f'Generating {len(seeds)} images to "{outdir}"...')
             batch_count = 1
             images_np_stack = np.zeros((len(seeds),1,*gt.shape))
-            #for batch_seeds in tqdm.tqdm(rank_batches, disable=dist.get_rank() != 0):
             for batch_seeds in tqdm.tqdm(rank_batches):
-                #dist.print0(f"Waiting for the green light to start generation for {batch_count}/{batches_per_process}")
-                # don't move to the next batch until all nodes have finished their current batch
-                #torch.distributed.barrier()
-                #dist.print0("Others finished. Good to go!")
                 batch_size = len(batch_seeds)
                 if batch_size == 0:
                     continue
@@ -255,7 +235,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
                 images_np_stack[batch_count-1,0,:,:] = one_image
                 batch_count += 1
 
-               # plot posterior statistics
+            # plot posterior statistics
             post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
             ssim_t = ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
 
@@ -277,11 +257,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
 
             #dist.print0(f"Node finished generation for {checkpoint_number}")
-            #dist.print0("waiting for others to finish..")
 
-            # Rank 0 goes first.
-            #if dist.get_rank() != 0:
-            #    torch.distributed.barrier()
             #dist.print0("Everyone finished.. Starting calculation..")
             ssims.append(ssim_t)
             rmses.append(rmse_t)
