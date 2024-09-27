@@ -399,6 +399,7 @@ class EDMPrecond(torch.nn.Module):
     def __init__(self,
         img_resolution,                     # Image resolution.
         img_channels,                       # Number of color channels.
+        out_channels,                       # Number of color channels.
         label_dim       = 0,                # Number of class labels, 0 = unconditional.
         use_fp16        = False,            # Execute the underlying model at FP16 precision?
         sigma_min       = 0,                # Minimum supported noise level.
@@ -416,7 +417,7 @@ class EDMPrecond(torch.nn.Module):
         self.sigma_min = sigma_min
         self.sigma_max = sigma_max
         self.sigma_data = sigma_data
-        self.model = globals()[model_type](img_resolution=img_resolution, in_channels=img_channels, out_channels=img_channels, label_dim=label_dim, gated=gated, **model_kwargs)
+        self.model = globals()[model_type](img_resolution=img_resolution, in_channels=img_channels, out_channels=out_channels, label_dim=label_dim, gated=gated, **model_kwargs)
     
     def forward(self, x, sigma,  force_fp32=False, **model_kwargs):
         x = x.to(torch.float32)
@@ -432,7 +433,7 @@ class EDMPrecond(torch.nn.Module):
         F_x = self.model((c_in * x).to(dtype),c_noise.flatten(),  **model_kwargs)
         assert F_x.dtype == dtype
         
-        D_x = c_skip * x + c_out * F_x.to(torch.float32)
+        D_x = c_skip * x[:,:1] + c_out * F_x.to(torch.float32)
         return D_x
 
     def round_sigma(self, sigma):

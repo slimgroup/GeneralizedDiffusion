@@ -64,7 +64,7 @@ def ambient_sampler(
     return gt_norm*x_next
 
 def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets, device=torch.device('cuda'),  **sampler_kwargs):
+         num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets,out_chan, device=torch.device('cuda'),  **sampler_kwargs):
 
     # we want to make sure that each gpu does not get more than batch size.
     # Hence, the following measures how many batches are going to be per GPU.
@@ -98,7 +98,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
 
 
-    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+2)
+    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+2, out_channels=out_chan)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
@@ -288,6 +288,7 @@ if __name__ == "__main__":
     parser.add_argument('--gt_loc', type=str, default="")
     parser.add_argument('--gt_norm', type=float, default=1.0)
     parser.add_argument('--cond_norm', type=float, default=1.0)
+    parser.add_argument('--out_chan', type=int, default=1)
     parser.add_argument('--use_offsets', action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
@@ -298,11 +299,12 @@ if __name__ == "__main__":
     gt_norm = args.gt_norm
     cond_norm = args.cond_norm
     use_offsets = args.use_offsets
+    out_chan = args.out_chan
     print(use_offsets)
 
     training_options_loc = network_loc+"/training_options.json"
     outdir = "sampling/"
 
     main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,device)
+         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,out_chan,device)
     

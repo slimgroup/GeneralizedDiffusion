@@ -31,13 +31,13 @@ class ConditionalLoss:
         
         noisy_image = y + n
         cat_input = torch.cat([noisy_image, cond], axis=1)
-        D_yn = net(cat_input, sigma,  augment_labels=augment_labels)#[:, :3]
-        print(y.shape)
-        print(D_yn.shape)
+        D_yn = net(cat_input, sigma,  augment_labels=augment_labels)
+        #print(y.shape)
+        #print(D_yn.shape)
 
-        D_yn = D_yn[:, :3]
-        print(D_yn.shape)
-        print((D_yn - y).shape)
+        #D_yn = D_yn[:, :3]
+        #print(D_yn.shape)
+        #print((D_yn - y).shape)
         
         train_loss = weight * ((D_yn - y) ** 2)
          
