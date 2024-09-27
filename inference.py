@@ -28,7 +28,8 @@ def ambient_sampler(
     S_churn=0.0, S_min=0.0, S_max=float('inf'), S_noise=10,
     cond_loc = "",
     image_dir = "",
-    cond=None
+    cond=None,
+    gt_norm=1
     ):
    
     # Time step discretization.
@@ -60,10 +61,10 @@ def ambient_sampler(
                 d_prime = (x_next - denoised) / t_next
                 x_next = x_hat + (t_next - t_hat) * (0.5 * d_cur + 0.5 * d_prime)
 
-    return x_next
+    return gt_norm*x_next
 
 def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_loc, gt_loc, device=torch.device('cuda'),  **sampler_kwargs):
+         num_generate,  cond_loc,back_loc, gt_loc, gt_norm, cond_norm,use_offsets, device=torch.device('cuda'),  **sampler_kwargs):
 
     torch.multiprocessing.set_start_method('spawn')
     dist.init()
@@ -84,13 +85,30 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     with dnnlib.util.open_url(training_options_loc, verbose=(dist.get_rank() == 0)) as f:
         training_options = json.load(f)
 
-    if training_options['dataset_kwargs']['use_labels']:
-        assert num_classes > 0, "If the network is class conditional, the number of classes must be positive."
-        label_dim = num_classes
-    else:
-        label_dim = 0
+    label_dim = 0
 
-    interface_kwargs = dict(img_resolution=training_options['dataset_kwargs']['resolution'], label_dim=label_dim, img_channels=2)
+
+    #load in condition
+    cond = np.load(cond_loc) / cond_norm
+    print(use_offsets)
+    if not use_offsets:
+        print("use only zero offset")
+        cond = cond[12,:,:]
+        #cond = cond[np.newaxis,...]
+
+    cond = torch.from_numpy(cond) 
+    cond = cond.repeat(1,1,1,1).to((device))
+
+    background = np.load(back_loc)
+    background = torch.from_numpy(background)  / gt_norm
+    background = background.repeat(1,1,1,1).to((device))
+
+    cond = torch.cat([cond, background], axis=1)
+    print(cond.shape)
+
+
+
+    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
@@ -136,26 +154,27 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
         #pdb.set_trace()
 
-        image_dir = os.path.join(outdir, str(checkpoint_number) + "/" + cond_loc[-12:-4])
+        image_dir = os.path.join(outdir, str(network_loc.split("/")[1]) + str(checkpoint_number) + "/" + cond_loc[-12:-4])
         os.makedirs(image_dir, exist_ok=True)
-
-        cond = np.load(cond_loc)
-        cond = torch.from_numpy(cond) 
-        cond = cond.repeat(1,1,1,1).to((device))
-
-        cond[0,0,0:16,:] = 0
+        
        
         a = np.quantile(np.absolute(cond.cpu()),0.98)
-        plt.figure(); plt.title("Condition")
+        plt.figure(); plt.title("Condition rtm")
         plt.imshow(cond[0,0,:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
         plt.axis("off")
         cb = plt.colorbar(fraction=0.0235, pad=0.04); 
-        plt.savefig(os.path.join(image_dir, "actual_condition.png"),bbox_inches = "tight",dpi=300)
+        plt.savefig(os.path.join(image_dir, "rtm_condition.png"),bbox_inches = "tight",dpi=300)
 
         gt = np.load(gt_loc) 
         vmin_gt = 1.5
-        vmax_gt = 3.7#4.5
+        vmax_gt = np.max(gt)
         cmap_gt = cc.cm['rainbow4']
+
+        plt.figure(); plt.title("Condition back")
+        plt.imshow(gt_norm*cond[0,-1,:,:].cpu(), vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
+        plt.axis("off")
+        cb = plt.colorbar(fraction=0.0235, pad=0.04); 
+        plt.savefig(os.path.join(image_dir, "back_condition.png"),bbox_inches = "tight",dpi=300)
 
         plt.figure();  plt.title("Ground truth")
         plt.imshow(gt, vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
@@ -187,7 +206,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             # Generate images.
             sampler_kwargs = {key: value for key, value in sampler_kwargs.items() if value is not None}
             images = ambient_sampler(net, latents,num_steps=num_steps, randn_like=rnd.randn_like,
-                cond=cond, image_dir=image_dir, **sampler_kwargs)
+                cond=cond, image_dir=image_dir,gt_norm=gt_norm, **sampler_kwargs)
             
             # Save Images
             images_np = images.cpu().detach().numpy()
@@ -218,13 +237,13 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
         plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_mean.png"),bbox_inches = "tight",dpi=300); plt.close()
 
         plt.figure(); plt.title("Stdev")
-        plt.imshow(np.std(images_np_stack,axis=0)[0,:,:],  vmin=0, vmax=None,   cmap = "magma")
+        plt.imshow(np.std(images_np_stack,axis=0)[0,:,:],  vmin=0, vmax=0.5,   cmap = "magma")
         plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
         plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"std.png"),bbox_inches = "tight",dpi=300); plt.close()
             
         rmse_t = np.sqrt(mean_squared_error(gt, post_mean))
         plt.figure(); plt.title("Error RMSE:"+str(round(rmse_t,4)))
-        plt.imshow(np.abs(post_mean-gt), vmin=0, vmax=None, cmap = "magma")
+        plt.imshow(np.abs(post_mean-gt), vmin=0, vmax=0.5, cmap = "magma")
         plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
         plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
 
@@ -240,7 +259,7 @@ if __name__ == "__main__":
    
     seeds = [i for i in range(0, 100)]
     max_batch_size = 1
-    num_generate = 2
+    num_generate = 16
     num_steps = 10
 
     device = torch.device('cuda')
@@ -248,17 +267,26 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--cond_loc', type=str, default="")
+    parser.add_argument('--back_loc', type=str, default="")
     parser.add_argument('--network_loc', type=str, default="")
     parser.add_argument('--gt_loc', type=str, default="")
+    parser.add_argument('--gt_norm', type=float, default=1.0)
+    parser.add_argument('--cond_norm', type=float, default=1.0)
+    parser.add_argument('--use_offsets', action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
     cond_loc = args.cond_loc
+    back_loc = args.back_loc
     vel_loc = args.gt_loc
     network_loc = args.network_loc
+    gt_norm = args.gt_norm
+    cond_norm = args.cond_norm
+    use_offsets = args.use_offsets
+    print(use_offsets)
 
     training_options_loc = network_loc+"/training_options.json"
     outdir = "sampling/"
 
     main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_loc, vel_loc, device)
+         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,device)
     
