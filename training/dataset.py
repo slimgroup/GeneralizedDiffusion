@@ -103,7 +103,8 @@ class Dataset(torch.utils.data.Dataset):
         cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy') / self.cond_norm
         if not self.use_offsets:
             print("use only zero offset")
-            cond = cond[12,:,:]
+            if len(cond.shape) > 2:
+                cond = cond[12,:,:]
             cond = cond[np.newaxis,...]
         #print(cond[1,100,100])
         #print(cond[10,100,100])

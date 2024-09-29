@@ -49,8 +49,8 @@ def parse_int_list(s):
 @click.option('--dataset_main_name_back', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
 
 @click.option('--num_offsets',     help='number of offsets in positive and negative so must be multiplied by two for total non-zero offsets.', metavar='INT',   type=click.IntRange(min=0), default=0)
-@click.option('--num_offsets',     help='number of offsets in positive and negative so must be multiplied by two for total non-zero offsets.', metavar='INT',   type=click.IntRange(min=0), default=0)
 @click.option('--use_offsets',         help='Enable offsets', metavar='BOOL',                     type=bool, default=False, show_default=True)
+@click.option('--out_chan',     help='number of channels to output', metavar='INT',                    type=click.IntRange(min=1), default=1)
 
 
 @click.option('--cond_norm',       help='cond_norm', metavar='FLOAT',                       type=click.FloatRange(min=0), default=1.0, show_default=True)
@@ -125,6 +125,7 @@ def main(**kwargs):
     # Network architecture.
     c.network_kwargs.update(model_type='SongUNet', embedding_type='positional', encoder_type='standard', decoder_type='standard')
     c.network_kwargs.update(channel_mult_noise=1, resample_filter=[1,1], model_channels=64, channel_mult=[2,2,2], gated=opts.gated)
+    c.network_kwargs.update(out_channels=opts.out_chan)
    
     # Preconditioning & loss function.
     c.network_kwargs.class_name = 'training.networks.EDMPrecond'

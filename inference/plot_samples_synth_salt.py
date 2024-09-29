@@ -1,6 +1,4 @@
 #module load Miniconda/3;module load ompi-cpu; salloc -A rafael -t01:80:00 --partition=cpu --mem-per-cpu=20G 
-
-
 import os
 import matplotlib.pyplot as plt
 import dnnlib
@@ -10,38 +8,32 @@ import colorcet as cc
 plt.rcParams["font.family"] = "serif"
 
 
-#plot plosterior samples and statistics
-
-
 #cmap_gt = cc.cm['CET_L03']
 cmap_gt = cc.cm['rainbow4']
 #cmap_gt = cc.cm['gouldian']
 
-
-image_dir = "sampling/final_plots/synthoseis/"
+image_dir = "sampling/final_plots/synthoseis_salt/"
 
 #i_str ="0981"
 #i_str ="0873"
 #i_str ="0988"
 #i_str ="0922"
-i_str ="0913"
+i_str ="0906"
 d = 0.0125
-gt  = np.load("/slimdata/rafaeldata/fwiuq_eod/gts_syntho_ext_test/gt_"+i_str+".npy")
-gt0 = np.load("/slimdata/rafaeldata/fwiuq_eod/gt0s_syntho_ext_test/gt0_"+i_str+".npy")
-rtm = np.load("/slimdata/rafaeldata/fwiuq_eod/rtms_syntho_ext_test/rtm_"+i_str+".npy")[12,:,:]
+gt  = np.load("/slimdata/rafaeldata/fwiuq_eod/gts_syntho_salt_test/gt_"+i_str+".npy")
+gt0 = np.load("/slimdata/rafaeldata/fwiuq_eod/gt0s_syntho_salt_test/gt0_"+i_str+".npy")
+rtm = np.load("/slimdata/rafaeldata/fwiuq_eod/rtms_syntho_salt_test/rtm_"+i_str+".npy")[:,:]
 
 vmin_gt = 1.5
 vmax_gt = np.max(gt)
 
 extent = (0,d*gt.shape[1],d*gt.shape[0],0)
 
-
 plt.figure(figsize=(7,3));  
 plt.imshow(gt, vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt, aspect=1, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]"); 
 #cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
 plt.savefig(os.path.join(image_dir+"gt_"+i_str+".png"), bbox_inches = "tight", dpi=300)
-
 
 plt.figure(figsize=(7,3)); 
 plt.imshow(gt0, vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt, aspect=1, extent=extent)
@@ -58,10 +50,7 @@ plt.savefig(os.path.join(image_dir+"rtm_"+i_str+".png"), bbox_inches = "tight", 
 
 
 net_name = "newloss-offsetsFalse450"
-#net_name = "newloss_cont-offsetsTrue751"
-#path = "sampling/00141-gpus2-batch10-synth_ext-offsetsFalse720/rtm_"+i_str+"/saved/"
-path = "sampling/00152-gpus2-batch10-synth_ext_newloss-offsetsFalse450/rtm_"+i_str+"/saved/"
-#path = "sampling/00150-gpus2-batch10-synth_ext_newloss_cont-offsetsTrue751/rtm_"+i_str+"/saved/"
+path = "sampling/00151-gpus2-batch10-synth_salt_newloss-offsetsFalse450/rtm_"+i_str+"/saved/"
 
 files_rtm = dnnlib.util.list_dir(path)
 
@@ -84,32 +73,29 @@ from skimage.metrics import mean_squared_error
 post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
 ssim_t = ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
 
-#plot some posterior statistics
-#plt.figure(figsize=(12,5)); #  plt.title("Posterior mean SSIM:"+str(round(ssim_t,4)))
 
 plt.figure(figsize=(7,3)); 
 plt.imshow(post_mean, vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt, aspect=1, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]"); 
 #cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
-plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+"_mean_"+i_str+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+i_str+"_mean_synth_salt.png"),bbox_inches = "tight",dpi=300); plt.close()
 
 
 plt.figure(figsize=(7,3)); 
 plt.imshow(images_np_stack[0,0,:,:], vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt, aspect=1, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]"); 
 #cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
-plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+"_post_"+i_str+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+i_str+"_post_synth_salt.png"),bbox_inches = "tight",dpi=300); plt.close()
 
 #cmap_error = cc.cm['CET_L3']
 cmap_error = "magma"
-
 
 post_std = np.std(images_np_stack,axis=0)[0,:,:]
 plt.figure(figsize=(7,3));    #plt.title("Posterior deviation")
 plt.imshow(post_std,  vmin=0, vmax=0.5,   cmap = cmap_error, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
 #plt.colorbar(fraction=0.0235, pad=0.04)
-plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+"std_"+i_str+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+i_str+"_std_synth_salt.png"),bbox_inches = "tight",dpi=300); plt.close()
  
 
 #import matplotlib.colors as mcolors
@@ -126,22 +112,25 @@ plt.figure(figsize=(7,3));  #plt.title("Error RMSE:"+str(round(rmse_t,4)))
 plt.imshow(post_error, vmin=0, vmax=0.5, cmap = cmap_error, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
 #plt.colorbar(fraction=0.0235, pad=0.04)
-plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+"_error_"+i_str+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+i_str+"_error_synth_salt.png"),bbox_inches = "tight",dpi=300); plt.close()
 
 
 cmap_error_gray = cc.cm['CET_L1']
 cmap_error_gray.set_over('red')
 threshold = 2
 
-support = post_error / (post_std)
+support = post_error / (post_std+1e-2)
 
 perc_256 = np.mean((support) > threshold)*100
+
+# >>> perc_256
+# 27.57110595703125
 
 plt.figure(figsize=(7,3));    #plt.title("Posterior deviation")
 plt.imshow(support,  vmin=0, vmax=threshold,   cmap = cmap_error_gray, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
 #plt.colorbar(fraction=0.0235, pad=0.04)
-plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+"std_bouman_new"+i_str+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir, net_name+"_p"+str(num_post_samples)+i_str+"_bouman_synth_salt.png"),bbox_inches = "tight",dpi=300); plt.close()
   
 
 for i in range(1,10):
@@ -169,7 +158,7 @@ plt.ylabel("Velocity [Km/s]")
 plt.xlabel("Depth [Km]")
 plt.legend()
 #plt.tight_layout()
-plt.savefig(os.path.join(image_dir,net_name+str(num_post_samples)+"trace"+str(i)+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir,net_name+str(num_post_samples)+i_str+"_traces_synth_salt.png"),bbox_inches = "tight",dpi=300); plt.close()
 
 
 
