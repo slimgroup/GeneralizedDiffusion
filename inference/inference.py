@@ -31,6 +31,7 @@ def ambient_sampler(
     cond=None,
     gt_norm=1
     ):
+    print(S_noise)
    
     # Time step discretization.
     step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
@@ -94,27 +95,26 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     print(use_offsets)
     if not use_offsets:
         print("use only zero offset")
-        cond = cond[12,:,:]
+        if len(cond.shape) > 2:
+            cond = cond[12,:,:]
         #cond = cond[np.newaxis,...]
 
-    
-    a = np.quantile(np.absolute(cond),0.97)
-    cond[cond > a] = a
-    cond[cond < -a] = -a
+
 
     cond = torch.from_numpy(cond) 
     cond = cond.repeat(1,1,1,1).to((device))
 
-    background = np.load(back_loc)
-    background = torch.from_numpy(background)  / gt_norm
-    background = background.repeat(1,1,1,1).to((device))
+    if not (back_loc == None):
+        background = np.load(back_loc)
+        background = torch.from_numpy(background)  / gt_norm
+        background = background.repeat(1,1,1,1).to((device))
 
-    cond = torch.cat([cond, background], axis=1)
+        cond = torch.cat([cond, background], axis=1)
     print(cond.shape)
 
 
-
-    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
+    #interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
+    interface_kwargs = dict(img_resolution=512, label_dim=0, img_channels=cond.shape[1]+1)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
@@ -174,14 +174,15 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
         gt = np.load(gt_loc) 
         vmin_gt = 1.5
-        vmax_gt = np.max(gt)
+        vmax_gt = None#np.max(gt)
         cmap_gt = cc.cm['rainbow4']
 
-        plt.figure(); plt.title("Condition back")
-        plt.imshow(gt_norm*cond[0,-1,:,:].cpu(), vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
-        plt.axis("off")
-        cb = plt.colorbar(fraction=0.0235, pad=0.04); 
-        plt.savefig(os.path.join(image_dir, "back_condition.png"),bbox_inches = "tight",dpi=300)
+        if not (back_loc == None):
+            plt.figure(); plt.title("Condition back")
+            plt.imshow(gt_norm*cond[0,-1,:,:].cpu(), vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
+            plt.axis("off")
+            cb = plt.colorbar(fraction=0.0235, pad=0.04); 
+            plt.savefig(os.path.join(image_dir, "back_condition.png"),bbox_inches = "tight",dpi=300)
 
         plt.figure();  plt.title("Ground truth")
         plt.imshow(gt, vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
@@ -195,6 +196,8 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
         # Loop over batches.
         #dist.print0(f'Generating {len(seeds)} images to "{outdir}"...')
+        S_noise=1.010
+        S_churn=80
         batch_count = 1
         images_np_stack = np.zeros((len(seeds),1,*gt.shape))
         #for batch_seeds in tqdm.tqdm(rank_batches, disable=dist.get_rank() != 0):
@@ -215,14 +218,14 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             # Generate images.
             sampler_kwargs = {key: value for key, value in sampler_kwargs.items() if value is not None}
             images = ambient_sampler(net, latents,num_steps=num_steps, randn_like=rnd.randn_like,
-                cond=cond, image_dir=image_dir,gt_norm=gt_norm, **sampler_kwargs)
+                cond=cond, image_dir=image_dir,gt_norm=gt_norm,S_noise=S_noise,S_churn=S_churn, **sampler_kwargs)
             
             # Save Images
             images_np = images.cpu().detach().numpy()
             for seed, one_image in zip(batch_seeds, images_np):
                 #dist.print0(f"Saving loc: {image_dir}")
                 os.makedirs(image_dir, exist_ok=True)
-                image_path = os.path.join(image_dir, "steps_"+str(num_steps)+"_"+f'{seed:04d}.png')
+                image_path = os.path.join(image_dir, "schurn_"+str(S_churn)+"_snoise_"+str(S_noise)+"steps_"+str(num_steps)+"_"+f'{seed:04d}.png')
 
                 plt.figure(); plt.title("Posterior Sample")
                 plt.imshow(one_image[0, :, :],   vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
@@ -243,18 +246,21 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
         plt.imshow(post_mean,  vmin=vmin_gt,vmax=vmax_gt,   cmap = cmap_gt)
         plt.axis("off"); 
         cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
-        plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_mean.png"),bbox_inches = "tight",dpi=300); plt.close()
+        plt.savefig(os.path.join(image_dir, "schurn_"+str(S_churn)+"_snoise_"+str(S_noise)+"steps_"+str(num_steps)+"_num_"+str(num_generate)+"_mean.png"),bbox_inches = "tight",dpi=300); plt.close()
 
-        plt.figure(); plt.title("Stdev")
-        plt.imshow(np.std(images_np_stack,axis=0)[0,:,:],  vmin=0, vmax=0.5,   cmap = "magma")
+        
+        post_std = np.std(images_np_stack,axis=0)[0,:,:]
+        rmsstd = np.sqrt(np.mean(post_std))
+        plt.figure(); plt.title("Stdev Ave:"+str(round(rmsstd,4)))
+        plt.imshow(post_std,  vmin=0, vmax=0.5,   cmap = "magma")
         plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
-        plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"std.png"),bbox_inches = "tight",dpi=300); plt.close()
+        plt.savefig(os.path.join(image_dir, "schurn_"+str(S_churn)+"_snoise_"+str(S_noise)+"steps_"+str(num_steps)+"_num_"+str(num_generate)+"std.png"),bbox_inches = "tight",dpi=300); plt.close()
             
         rmse_t = np.sqrt(mean_squared_error(gt, post_mean))
         plt.figure(); plt.title("Error RMSE:"+str(round(rmse_t,4)))
         plt.imshow(np.abs(post_mean-gt), vmin=0, vmax=0.5, cmap = "magma")
         plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
-        plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
+        plt.savefig(os.path.join(image_dir, "schurn_"+str(S_churn)+"_snoise_"+str(S_noise)+"steps_"+str(num_steps)+"_num_"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
 
         #dist.print0(f"Node finished generation for {checkpoint_number}")
         #dist.print0("waiting for others to finish..")
@@ -268,7 +274,7 @@ if __name__ == "__main__":
    
     seeds = [i for i in range(0, 100)]
     max_batch_size = 1
-    num_generate = 16
+    num_generate = 2
     num_steps = 10
 
     device = torch.device('cuda')
@@ -276,7 +282,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--cond_loc', type=str, default="")
-    parser.add_argument('--back_loc', type=str, default="")
+    parser.add_argument('--back_loc', type=str, default=None)
     parser.add_argument('--network_loc', type=str, default="")
     parser.add_argument('--gt_loc', type=str, default="")
     parser.add_argument('--gt_norm', type=float, default=1.0)

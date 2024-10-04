@@ -25,8 +25,8 @@ class Dataset(torch.utils.data.Dataset):
         name,                   # Name of the dataset.
         dataset_main_name,
         dataset_main_name_cond,
-        dataset_main_name_back,
         raw_shape,              # Shape of the raw image data (NCHW).
+        dataset_main_name_back=None,
         cond_norm=1,
         gt_norm=1,
         use_offsets=False,
@@ -55,9 +55,9 @@ class Dataset(torch.utils.data.Dataset):
 
         # Apply max_size.
         self._raw_idx = np.arange(self._raw_shape[0], dtype=np.int64)
-        if (max_size is not None) and (self._raw_idx.size > max_size):
+        #if (max_size is not None) and (self._raw_idx.size > max_size):
             # np.random.RandomState(random_seed % (1 << 31)).shuffle(self._raw_idx)
-            self._raw_idx = np.sort(self._raw_idx[:max_size])
+        #    self._raw_idx = np.sort(self._raw_idx[:max_size])
 
         # Apply xflip.
         self.xflip = xflip
@@ -102,27 +102,19 @@ class Dataset(torch.utils.data.Dataset):
 
         cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy') / self.cond_norm
         if not self.use_offsets:
-            print("use only zero offset")
+            print("use only zero offset:")
             if len(cond.shape) > 2:
-                cond = cond[12,:,:]
+                rtm_chan = int(round(cond.shape[0]/2))
+                print(rtm_chan)
+                cond = cond[rtm_chan,:,:]
             cond = cond[np.newaxis,...]
-        #print(cond[1,100,100])
-        #print(cond[10,100,100])
-
-        #pdb.set_trace()
-
-        #print(cond.shape)
-
-        #cond = cond[12-self.num_offsets:12+self.num_offsets+1,:,:] / self.cond_norm
-        #print(cond.shape)
-        #    / self.num_offsets
 
         #load in background model 
-        background = np.load(f'{self.dataset_main_name_back}_{idx_str}.npy')
-        background = background[np.newaxis,...]  / self.gt_norm
-
-        #cond = torch.cat([cond, background], axis=0)
-        cond = np.concatenate([cond, background], axis=0)
+        if not (self.dataset_main_name_back == None):
+            print("using background ")
+            background = np.load(f'{self.dataset_main_name_back}_{idx_str}.npy')
+            background = background[np.newaxis,...]  / self.gt_norm
+            cond = np.concatenate([cond, background], axis=0)
 
         target_image = np.load(f'{self.dataset_main_name}_{idx_str}.npy')
         target_image = target_image[np.newaxis,...]  / self.gt_norm
@@ -215,7 +207,7 @@ class ImageFolderDataset(Dataset):
         raw_shape = [len(self._image_fnames)] + list(self._load_raw_image(0).shape)
         if resolution is not None and (raw_shape[2] != resolution):
             raise IOError('Image files do not match the specified resolution')
-        super().__init__(name=name, raw_shape=raw_shape, **super_kwargs)
+        super().__init__(name=name, raw_shape=raw_shape,**super_kwargs)
 
     @staticmethod
     def _file_ext(fname):

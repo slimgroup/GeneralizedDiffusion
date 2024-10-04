@@ -45,8 +45,8 @@ def parse_int_list(s):
 @click.option('--outdir',        help='Where to save the results', metavar='DIR',                   type=str, default="")
 @click.option('--data',          help='Path to the dataset', metavar='ZIP|DIR',                     type=str, default = "")
 @click.option('--dataset_main_name', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
-@click.option('--dataset_main_name_cond', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
-@click.option('--dataset_main_name_back', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = "")
+@click.option('--dataset_main_name_cond', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = None)
+@click.option('--dataset_main_name_back', help='Path to the dataset main folder', metavar='ZIP|DIR',     type=str, default = None)
 
 @click.option('--num_offsets',     help='number of offsets in positive and negative so must be multiplied by two for total non-zero offsets.', metavar='INT',   type=click.IntRange(min=0), default=0)
 @click.option('--use_offsets',         help='Enable offsets', metavar='BOOL',                     type=bool, default=False, show_default=True)

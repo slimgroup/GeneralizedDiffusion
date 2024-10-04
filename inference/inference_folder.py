@@ -64,7 +64,7 @@ def ambient_sampler(
     return gt_norm*x_next
 
 def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets,out_chan, device=torch.device('cuda'),  **sampler_kwargs):
+         num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets,out_chan,num_skip, device=torch.device('cuda'),  **sampler_kwargs):
 
     # we want to make sure that each gpu does not get more than batch size.
     # Hence, the following measures how many batches are going to be per GPU.
@@ -90,16 +90,25 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     if not use_offsets:
         print("use only zero offset")
         if len(cond.shape) > 2:
-            cond = cond[12,:,:]
+            cond = cond[int(round(cond.shape[0]/2)),:,:]
         #cond = cond[np.newaxis,...]
 
     cond = torch.from_numpy(cond) 
     cond = cond.repeat(1,1,1,1).to((device))
     print(cond.shape)
 
+    if not (back_base == None):
+        back_loc = back_base+"gt0_"+files_cond[0][-8:]
+        #back_loc = back_base+files_cond[0]
+        background = np.load(back_loc)
+        background = torch.from_numpy(background)  / gt_norm
+        background = background.repeat(1,1,1,1).to((device))
+
+        cond = torch.cat([cond, background], axis=1)
 
 
-    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+2)
+
+    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
@@ -145,37 +154,50 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
         ssims = []
         rmses = []
-        print(files_cond[0::4])
-        for i_str in files_cond[0::4]:
+        print(files_cond[0::num_skip])
+        for i_str in files_cond[0::num_skip]:
 
             cond_loc = cond_base+i_str
             gt_loc = gt_base+"gt_"+i_str[-8:]
-            back_loc = back_base+"gt0_"+i_str[-8:]
+            
             print(cond_loc)
             print(gt_loc)
 
+            gt = np.load(gt_loc) 
+            vmin_gt = 1.5
+            vmax_gt = np.max(gt)
+            cmap_gt = cc.cm['rainbow4']
+
             cond = np.load(cond_loc) / cond_norm
+            #pdb.set_trace()
             if not use_offsets:
                 print("use only zero offset")
                 if len(cond.shape) > 2:
-                    cond = cond[12,:,:]
+                    cond = cond[int(round(cond.shape[0]/2)),:,:]
                 #cond = cond[np.newaxis,...]
 
             cond = torch.from_numpy(cond) 
             cond = cond.repeat(1,1,1,1).to((device))
 
-            background = np.load(back_loc)
-            background = torch.from_numpy(background)  / gt_norm
-            background = background.repeat(1,1,1,1).to((device))
-
-            cond = torch.cat([cond, background], axis=1)
-
-        #pdb.set_trace()
-
             image_dir = os.path.join(outdir, str(network_loc.split("/")[1]) + str(checkpoint_number) + "/" + cond_loc[-12:-4])
             os.makedirs(image_dir, exist_ok=True)
             
-           
+            
+            if not (back_base == None):
+                back_loc = back_base+"gt0_"+i_str[-8:]
+                background = np.load(back_loc)
+                background = torch.from_numpy(background)  / gt_norm
+                background = background.repeat(1,1,1,1).to((device))
+
+                cond = torch.cat([cond, background], axis=1)
+
+
+                plt.figure(); plt.title("Condition back")
+                plt.imshow(gt_norm*cond[0,-1,:,:].cpu(), vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
+                plt.axis("off")
+                cb = plt.colorbar(fraction=0.0235, pad=0.04); 
+                plt.savefig(os.path.join(image_dir, "back_condition.png"),bbox_inches = "tight",dpi=300)
+
             a = np.quantile(np.absolute(cond.cpu()),0.98)
             plt.figure(); plt.title("Condition rtm")
             plt.imshow(cond[0,0,:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
@@ -183,16 +205,12 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             cb = plt.colorbar(fraction=0.0235, pad=0.04); 
             plt.savefig(os.path.join(image_dir, "rtm_condition.png"),bbox_inches = "tight",dpi=300)
 
-            gt = np.load(gt_loc) 
-            vmin_gt = 1.5
-            vmax_gt = np.max(gt)
-            cmap_gt = cc.cm['rainbow4']
 
-            plt.figure(); plt.title("Condition back")
-            plt.imshow(gt_norm*cond[0,-1,:,:].cpu(), vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
-            plt.axis("off")
-            cb = plt.colorbar(fraction=0.0235, pad=0.04); 
-            plt.savefig(os.path.join(image_dir, "back_condition.png"),bbox_inches = "tight",dpi=300)
+
+        #pdb.set_trace()
+
+            
+           
 
             plt.figure();  plt.title("Ground truth")
             plt.imshow(gt, vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
@@ -285,12 +303,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--cond_loc', type=str, default="")
-    parser.add_argument('--back_loc', type=str, default="")
+    parser.add_argument('--back_loc', type=str, default=None)
     parser.add_argument('--network_loc', type=str, default="")
     parser.add_argument('--gt_loc', type=str, default="")
     parser.add_argument('--gt_norm', type=float, default=1.0)
     parser.add_argument('--cond_norm', type=float, default=1.0)
     parser.add_argument('--out_chan', type=int, default=1)
+    parser.add_argument('--num_skip', type=int, default=4)
     parser.add_argument('--use_offsets', action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
@@ -302,11 +321,12 @@ if __name__ == "__main__":
     cond_norm = args.cond_norm
     use_offsets = args.use_offsets
     out_chan = args.out_chan
+    num_skip = args.num_skip
     print(use_offsets)
 
     training_options_loc = network_loc+"/training_options.json"
     outdir = "sampling/"
 
     main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,out_chan,device)
+         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,out_chan,num_skip,device)
     
