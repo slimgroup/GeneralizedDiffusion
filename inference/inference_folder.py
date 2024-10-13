@@ -64,7 +64,7 @@ def ambient_sampler(
     return gt_norm*x_next
 
 def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets,out_chan,num_skip, device=torch.device('cuda'),  **sampler_kwargs):
+         num_generate,  cond_base, back_base, gt_base, gt_norm, cond_norm,use_offsets,out_chan,num_skip, trained_res,c_chan,device=torch.device('cuda'),  **sampler_kwargs):
 
     # we want to make sure that each gpu does not get more than batch size.
     # Hence, the following measures how many batches are going to be per GPU.
@@ -107,8 +107,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
         cond = torch.cat([cond, background], axis=1)
 
 
-
-    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
+    interface_kwargs = dict(img_resolution=trained_res, label_dim=0, img_channels=cond.shape[1]+1)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
@@ -180,8 +179,9 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             cond = cond.repeat(1,1,1,1).to((device))
 
             image_dir = os.path.join(outdir, str(network_loc.split("/")[1]) + str(checkpoint_number) + "/" + cond_loc[-12:-4])
-            os.makedirs(image_dir, exist_ok=True)
             
+           
+            os.makedirs(image_dir, exist_ok=True)
             
             if not (back_base == None):
                 back_loc = back_base+"gt0_"+i_str[-8:]
@@ -198,7 +198,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
                 cb = plt.colorbar(fraction=0.0235, pad=0.04); 
                 plt.savefig(os.path.join(image_dir, "back_condition.png"),bbox_inches = "tight",dpi=300)
 
-            a = np.quantile(np.absolute(cond.cpu()),0.98)
+            a = np.quantile(np.absolute(cond[0,0,:,:].cpu()),0.95)
             plt.figure(); plt.title("Condition rtm")
             plt.imshow(cond[0,0,:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
             plt.axis("off")
@@ -309,7 +309,9 @@ if __name__ == "__main__":
     parser.add_argument('--gt_norm', type=float, default=1.0)
     parser.add_argument('--cond_norm', type=float, default=1.0)
     parser.add_argument('--out_chan', type=int, default=1)
-    parser.add_argument('--num_skip', type=int, default=4)
+    parser.add_argument('--c_chan', type=int, default=1)
+    parser.add_argument('--num_skip', type=int, default=1)
+    parser.add_argument('--trained_res', type=int, default=512)
     parser.add_argument('--use_offsets', action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
@@ -321,12 +323,14 @@ if __name__ == "__main__":
     cond_norm = args.cond_norm
     use_offsets = args.use_offsets
     out_chan = args.out_chan
+    c_chan = args.c_chan
     num_skip = args.num_skip
+    trained_res = args.trained_res
     print(use_offsets)
 
     training_options_loc = network_loc+"/training_options.json"
     outdir = "sampling/"
 
     main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
-         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,out_chan,num_skip,device)
+         num_generate,  cond_loc,back_loc, vel_loc, gt_norm, cond_norm, use_offsets,out_chan,num_skip,trained_res,c_chan,device)
     

@@ -2,8 +2,8 @@
 
 import numpy as np
 
-ssims_curr = np.load('sampling/metrics/00167-gpus2-batch10-compass-offsetsTrue300000015_ssims.npy')
-rmses_curr = np.load('sampling/metrics/00167-gpus2-batch10-compass-offsetsTrue300000015_rmses.npy')
+ssims_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_ssims.npy')
+rmses_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_rmses.npy')
 
 np.mean(ssims_curr)
 np.mean(rmses_curr)
@@ -14,6 +14,7 @@ ssims_new = np.load('sampling/metrics/00163-gpus2-batch10-synth_salt_badback_con
 rmses_prev = np.load('sampling/metrics/00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue451000015_rmses.npy')
 rmses_new = np.load('sampling/metrics/00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse691000015_rmses.npy')
 
+
 np.mean(ssims_prev)
 np.mean(ssims_new)
 
@@ -21,7 +22,133 @@ np.mean(rmses_prev)
 np.mean(rmses_new)
 
 
+#aspire 1 512 is good
+# >>> ssims_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6929933747426862
+# >>> np.mean(rmses_curr)
+# 0.2645962042022104
+
+#aspire 1 extra it definitely overfits quickly not overall better than without extra
+# >>> ssims_curr = np.load('sampling/metrics/00190-gpus2-batch10-seam_filter_extra-offsetsFalse210000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00190-gpus2-batch10-seam_filter_extra-offsetsFalse210000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6816747406655749
+# >>> np.mean(rmses_curr)
+# 0.28952915172225463
+
+#aspire 1 extra
+# >>> ssims_curr = np.load('sampling/metrics/00190-gpus2-batch10-seam_filter_extra-offsetsFalse630000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00190-gpus2-batch10-seam_filter_extra-offsetsFalse630000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6683730134496737
+# >>> np.mean(rmses_curr)
+# 0.310053095606509
+
+#Aspire 1
+# >>> ssims_curr = np.load('sampling/metrics/00179-gpus2-batch10-seam_filter-offsetsFalse210000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00179-gpus2-batch10-seam_filter-offsetsFalse210000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6803279387248475
+# >>> np.mean(rmses_curr)
+# 0.2800342991214415
+
+
+#stacked is better with back. 
+# >>> ssims_curr = np.load('sampling/metrics/00189-gpus2-batch10-seam_filter_2_stack_noback-offsetsTrue630000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00189-gpus2-batch10-seam_filter_2_stack_noback-offsetsTrue630000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6823422909349793
+# >>> np.mean(rmses_curr)
+# 0.2992105065781036
+
+#aspire 3 seems a bit overfitted
+# >>> ssims_curr = np.load('sampling/metrics/00185-gpus2-batch10-seam_filter_3-offsetsFalse480000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00185-gpus2-batch10-seam_filter_3-offsetsFalse480000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6770184447984672
+# >>> np.mean(rmses_curr)
+# 0.3022267517020551
+
+#aspire 3 is currently better than aspire 2 but not better with aspire 2 stacked
+# >>> import numpy as np
+# >>> ssims_curr = np.load('sampling/metrics/00185-gpus2-batch10-seam_filter_3-offsetsFalse870000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00185-gpus2-batch10-seam_filter_3-offsetsFalse870000015_rmses.npy')
+# >>> np.mean(ssims_curr)
+# 0.6754199497129805
+# >>> np.mean(rmses_curr)
+# 0.3043104514972582
+
+#A tiny bit of improvement from 570 epoch. probably not worth it. 
+# >>> ssims_curr = np.load('sampling/metrics/00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue270000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue270000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6874346102096549
+# >>> np.mean(rmses_curr)
+# 0.2662565654975931
+
+#multiple rtms helps with rmse in fact it is only better than aspire 1 if we use the extra rtms 
+# >>> ssims_curr = np.load('sampling/metrics/00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue570000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue570000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6852602468983702
+# >>> np.mean(rmses_curr)
+# 0.2613443545165191
+
+# a bit better with more time. 
+# >>> ssims_curr = np.load('sampling/metrics/00182-gpus2-batch10-seam_filter_2-offsetsFalse540000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00182-gpus2-batch10-seam_filter_2-offsetsFalse540000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6840824908990304
+# >>> np.mean(rmses_curr)
+# 0.31032668062345714
+
+# >>> ssims_curr = np.load('sampling/metrics/00182-gpus2-batch10-seam_filter_2-offsetsFalse300000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00182-gpus2-batch10-seam_filter_2-offsetsFalse300000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6786569254598425
+# >>> np.mean(rmses_curr)
+# 0.3141641735152791
+
+
+
+#did not gain a lot from the new training
+# >>> ssims_curr = np.load('sampling/metrics/00179-gpus2-batch10-seam_filter-offsetsFalse450000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00179-gpus2-batch10-seam_filter-offsetsFalse450000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6737242350201043
+# >>> np.mean(rmses_curr)
+# 0.291648884192577
+# >>> ssims_curr = np.load('sampling/metrics/00179-gpus2-batch10-seam_filter-offsetsFalse690000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00179-gpus2-batch10-seam_filter-offsetsFalse690000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6717851143879638
+# >>> np.mean(rmses_curr)
+# 0.29485213269727806
+
 #compass with offsets is really good better than wiser with normalizing flows. 
+#beats without offsets with lesss epochs. 
+# >>> ssims_curr = np.load('sampling/metrics/00172-gpus2-batch10-compass-offsetsFalse720000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00172-gpus2-batch10-compass-offsetsFalse720000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.8366788027015463
+# >>> np.mean(rmses_curr)
+# 0.11424790154406482
+
 # >>> ssims_curr = np.load('sampling/metrics/00167-gpus2-batch10-compass-offsetsTrue300000015_ssims.npy')
 # >>> rmses_curr = np.load('sampling/metrics/00167-gpus2-batch10-compass-offsetsTrue300000015_rmses.npy')
 # >>> 
@@ -29,6 +156,25 @@ np.mean(rmses_new)
 # 0.8769190112744195
 # >>> np.mean(rmses_curr)
 # 0.09216434046692745
+
+#already overfit
+# >>> ssims_curr = np.load('sampling/metrics/00173-gpus2-batch10-seam_new-offsetsFalse391000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00173-gpus2-batch10-seam_new-offsetsFalse391000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6371933183565034
+# >>> np.mean(rmses_curr)
+# 0.3564152611037986
+
+# >>> ssims_curr = np.load('sampling/metrics/00173-gpus2-batch10-seam_new-offsetsFalse931000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00173-gpus2-batch10-seam_new-offsetsFalse931000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6295618823417942
+# >>> np.mean(rmses_curr)
+# 0.3894588063647079
+
+
 
 # similar. with offsets slitly better
 # >>> ssims_prev = np.load('sampling/metrics/00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue451000015_ssims.npy')

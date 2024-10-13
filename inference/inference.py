@@ -114,7 +114,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
 
     #interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
-    interface_kwargs = dict(img_resolution=512, label_dim=0, img_channels=cond.shape[1]+1)
+    interface_kwargs = dict(img_resolution=256, label_dim=0, img_channels=cond.shape[1]+1)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 
@@ -196,8 +196,10 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
         # Loop over batches.
         #dist.print0(f'Generating {len(seeds)} images to "{outdir}"...')
-        S_noise=1.010
-        S_churn=80
+        #S_noise=1.010
+        #S_churn=80
+        S_noise=1.0
+        S_churn=0
         batch_count = 1
         images_np_stack = np.zeros((len(seeds),1,*gt.shape))
         #for batch_seeds in tqdm.tqdm(rank_batches, disable=dist.get_rank() != 0):
@@ -274,7 +276,7 @@ if __name__ == "__main__":
    
     seeds = [i for i in range(0, 100)]
     max_batch_size = 1
-    num_generate = 2
+    num_generate = 64
     num_steps = 10
 
     device = torch.device('cuda')
