@@ -103,7 +103,6 @@ class Dataset(torch.utils.data.Dataset):
         cond = np.load(f'{self.dataset_main_name_cond}_{idx_str}.npy') / self.cond_norm
         #print(cond.shape)
         if not self.use_offsets:
-            print("use only zero offset:")
             if len(cond.shape) > 2:
                 rtm_chan = int(round(cond.shape[0]/2))
                 print(rtm_chan)
@@ -112,7 +111,6 @@ class Dataset(torch.utils.data.Dataset):
 
         #load in background model 
         if not (self.dataset_main_name_back == None):
-            print("using background ")
             background = np.load(f'{self.dataset_main_name_back}_{idx_str}.npy')  / self.gt_norm
             if len(background.shape) < 3:
                 background = background[np.newaxis,...] 

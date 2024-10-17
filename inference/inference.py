@@ -96,7 +96,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     if not use_offsets:
         print("use only zero offset")
         if len(cond.shape) > 2:
-            cond = cond[12,:,:]
+            cond = cond[int(round(cond.shape[0]/2)),:,:]
         #cond = cond[np.newaxis,...]
 
 
@@ -114,7 +114,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
 
     #interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
-    interface_kwargs = dict(img_resolution=256, label_dim=0, img_channels=cond.shape[1]+1)
+    interface_kwargs = dict(img_resolution=cond.shape[2], label_dim=0, img_channels=cond.shape[1]+1)
     network_kwargs = training_options['network_kwargs']
     model_to_be_initialized = dnnlib.util.construct_class_by_name(**network_kwargs, **interface_kwargs) # subclass of torch.nn.Module
 

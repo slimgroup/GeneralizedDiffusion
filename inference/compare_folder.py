@@ -2,25 +2,283 @@
 
 import numpy as np
 
-ssims_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_ssims.npy')
-rmses_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_rmses.npy')
+
+# Load the arrays
+loaded_arrays = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue150_metrics.npz')
+
+# Access individual arrays
+ssims = loaded_arrays['ssims']
+rmses = loaded_arrays['rmses']
+covs = loaded_arrays['covs']
+uces = loaded_arrays['uces']
+zscores = loaded_arrays['zscores']
+
+np.mean(ssims)
+np.mean(rmses)
+np.mean(covs)
+np.mean(uces)
+np.mean(zscores)
+
+np.std(ssims)
+np.std(rmses)
+np.std(covs)
+np.std(uces)
+np.std(zscores)
+
+
+
+
+import numpy as np
+
+ssims_curr = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue270000015_ssims.npy')
+rmses_curr = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue270000015_rmses.npy')
 
 np.mean(ssims_curr)
 np.mean(rmses_curr)
 
-ssims_prev = np.load('sampling/metrics/00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue451000015_ssims.npy')
-ssims_new = np.load('sampling/metrics/00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse691000015_ssims.npy')
+# with 64 posterior samples (better of course)
+# >>> # Load the arrays
+# >>> loaded_arrays = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue150_metrics.npz')
 
-rmses_prev = np.load('sampling/metrics/00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue451000015_rmses.npy')
-rmses_new = np.load('sampling/metrics/00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse691000015_rmses.npy')
+# >>> 
+# >>> # Access individual arrays
+# >>> ssims = loaded_arrays['ssims']
+# >>> rmses = loaded_arrays['rmses']
+# >>> covs = loaded_arrays['covs']
+# >>> uces = loaded_arrays['uces']
+# >>> zscores = loaded_arrays['zscores']
+# >>> 
+# >>> np.mean(ssims)
+# 0.7132293127960135
+# >>> np.mean(rmses)
+# 0.2552170294791712
+# >>> np.mean(covs)
+# 66.60406830113962
+# >>> np.mean(uces)
+# 0.04374536692761795
+# >>> np.mean(zscores)
+# 18.042734128619554
+# >>> 
+# >>> np.std(ssims)
+# 0.02604409884285036
+# >>> np.std(rmses)
+# 0.013866959374065407
+# >>> np.std(covs)
+# 10.47409784393786
+# >>> np.std(uces)
+# 0.015462894308613065
+# >>> np.std(zscores)
+# 5.006301404949596
+
+# with 16 posterior samples
+# >>> loaded_arrays = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue150_metrics.npz')
+# >>> 
+# >>> # Access individual arrays
+# >>> ssims = loaded_arrays['ssims']
+# >>> rmses = loaded_arrays['rmses']
+# >>> covs = loaded_arrays['covs']
+# >>> uces = loaded_arrays['uces']
+# >>> zscores = loaded_arrays['zscores']
+# >>> 
+# >>> np.mean(ssims)
+# 0.705960032186467
+# >>> np.mean(rmses)
+# 0.25814610136600025
+# >>> np.mean(covs)
+# 52.92839960220757
+# >>> np.mean(uces)
+# 0.04989581636121334
+# >>> np.mean(zscores)
+# 20.778928984195815
+# >>> 
+# >>> np.std(ssims)
+# 0.025434530270569855
+# >>> np.std(rmses)
+# 0.013425967384398874
+# >>> np.std(covs)
+# 9.771400488703607
+# >>> np.std(uces)
+# 0.014787930811142316
+# >>> np.std(zscores)
+# 6.027910214985772
+
+# >>> loaded_arrays = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue300_metrics.npz')
+# >>> 
+# >>> # Access individual arrays
+# >>> ssims = loaded_arrays['ssims']
+# >>> rmses = loaded_arrays['rmses']
+# >>> covs = loaded_arrays['covs']
+# >>> uces = loaded_arrays['uces']
+# >>> zscores = loaded_arrays['zscores']
+# >>> 
+# >>> np.mean(ssims)
+# 0.704943518748251
+# >>> np.mean(rmses)
+# 0.25754659218348536
+# >>> np.mean(covs)
+# 53.50057619427322
+# >>> np.mean(uces)
+# 0.06475994283854503
+# >>> np.mean(zscores)
+# 25.522172560385606
+# >>> 
+# >>> np.std(ssims)
+# 0.03067459032775649
+# >>> np.std(rmses)
+# 0.016155788647581555
+# >>> np.std(covs)
+# 10.79709972085251
+# >>> np.std(uces)
+# 0.01670871129024418
+# >>> np.std(zscores)
+# 5.748125431997944
+
+# >>> loaded_arrays = np.load('sampling/metrics/00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue631_metrics.npz')
+# >>> 
+# >>> # Access individual arrays
+# >>> ssims = loaded_arrays['ssims']
+# >>> rmses = loaded_arrays['rmses']
+# >>> covs = loaded_arrays['covs']
+# >>> uces = loaded_arrays['uces']
+# >>> zscores = loaded_arrays['zscores']
+# >>> 
+# >>> np.mean(ssims)
+# 0.9188846450158819
+# >>> np.mean(rmses)
+# 0.0795380203624175
+# >>> np.mean(covs)
+# 72.522720636106
+# >>> np.mean(uces)
+# 0.009228814999202957
+# >>> np.mean(zscores)
+# 5.416675642424939
+# >>> 
+# >>> np.std(ssims)
+# 0.05825978780079537
+# >>> np.std(rmses)
+# 0.05556564070987338
+# >>> np.std(covs)
+# 8.60000536041981
+# >>> np.std(uces)
+# 0.009429469369150487
+# >>> np.std(zscores)
+# 3.7857284333661188
+
+# >>> loaded_arrays = np.load('sampling/metrics/00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse931_metrics.npz')
+# >>> 
+# >>> # Access individual arrays
+# >>> ssims = loaded_arrays['ssims']
+# >>> rmses = loaded_arrays['rmses']
+# >>> covs = loaded_arrays['covs']
+# >>> uces = loaded_arrays['uces']
+# >>> zscores = loaded_arrays['zscores']
+# >>> 
+# >>> np.mean(ssims)
+# 0.9109068750284395
+# >>> np.mean(rmses)
+# 0.085071461105811
+# >>> np.mean(covs)
+# 74.68836167279412
+# >>> np.mean(uces)
+# 0.012295457162930514
+# >>> np.mean(zscores)
+# 7.844842648973652
+# >>> 
+# >>> np.std(ssims)
+# 0.06486796528994532
+# >>> np.std(rmses)
+# 0.06104994728736084
+# >>> np.std(covs)
+# 9.649387016820071
+# >>> np.std(uces)
+# 0.013810440727939903
+# >>> np.std(zscores)
+# 6.4216993304931
 
 
-np.mean(ssims_prev)
-np.mean(ssims_new)
+# >>> loaded_arrays = np.load('sampling/metrics/00172-gpus2-batch10-compass-offsetsFalse150_metrics.npz')
+# >>> 
+# >>> # Access individual arrays
+# >>> ssims = loaded_arrays['ssims']
+# >>> rmses = loaded_arrays['rmses']
+# >>> covs = loaded_arrays['covs']
+# >>> uces = loaded_arrays['uces']
+# >>> zscores = loaded_arrays['zscores']
+# >>> 
+# >>> np.mean(ssims)
+# 0.8112031379236931
+# >>> np.mean(rmses)
+# 0.12307138198545084
+# >>> np.mean(covs)
+# 73.78565470377605
+# >>> np.mean(uces)
+# 0.01314598669507817
+# >>> np.mean(zscores)
+# 10.716078016493055
+# >>> 
+# >>> np.std(ssims)
+# 0.036243402401979
+# >>> np.std(rmses)
+# 0.018824216518388705
+# >>> np.std(covs)
+# 3.674732528279025
+# >>> np.std(uces)
+# 0.006768468238817529
+# >>> np.std(zscores)
+# 2.587325933991739
 
-np.mean(rmses_prev)
-np.mean(rmses_new)
+# >>> loaded_arrays = np.load('sampling/metrics/00167-gpus2-batch10-compass-offsetsTrue120_metrics.npy.npz')
+# >>> 
+# >>> 
+# >>> np.mean(ssims)
+# 0.846520537491669
+# >>> np.mean(rmses)
+# 0.10522567349499752
+# >>> np.mean(covs)
+# 74.83503553602431
+# >>> np.mean(uces)
+# 0.011068081303934729
+# >>> np.mean(zscores)
+# 9.924062093098959
+# >>> 
+# >>> np.std(ssims)
+# 0.034595731974445286
+# >>> np.std(rmses)
+# 0.015161473883942124
+# >>> np.std(covs)
+# 2.768648952989299
+# >>> np.std(uces)
+# 0.005916031422936865
+# >>> np.std(zscores)
+# 2.6244288110246723a
 
+# >>> ssims_curr = np.load('sampling/metrics/00194-gpus2-batch10-seam_ext-offsetsTrue300000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00194-gpus2-batch10-seam_ext-offsetsTrue300000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6908418704794292
+# >>> np.mean(rmses_curr)
+# 0.27362565730382493
+
+
+#offsets and 512 is insanely good
+
+# >>> ssims_curr = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue270000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00196-gpus2-batch4-seam_ext_512-offsetsTrue270000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.7056490746015949
+# >>> np.mean(rmses_curr)
+# 0.2575958135588526
+
+#aspire 1 with offsets a bit better than 
+# >>> ssims_curr = np.load('sampling/metrics/00194-gpus2-batch10-seam_ext-offsetsTrue180000015_ssims.npy')
+# >>> rmses_curr = np.load('sampling/metrics/00194-gpus2-batch10-seam_ext-offsetsTrue180000015_rmses.npy')
+# >>> 
+# >>> np.mean(ssims_curr)
+# 0.6903475472697458
+# >>> np.mean(rmses_curr)
+# 0.27103811639948083
 
 #aspire 1 512 is good
 # >>> ssims_curr = np.load('sampling/metrics/00193-gpus2-batch4-seam_filter_512-offsetsFalse390000015_ssims.npy')
