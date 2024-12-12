@@ -51,8 +51,8 @@ image_dir = "sampling/final_plots/galactic/"
 
 net_name = "synth"
 #net_name = "newloss_cont-offsetsTrue751"
-#path = "sampling/00141-gpus2-batch10-synth_ext-offsetsFalse720/rtm_"+i_str+"/saved/"
-path = "/slimdata/rafaeldata/seam_rtm_diffusion/sampling/galactic_back_1001/wi_final/saved/"
+path = "sampling/00141-gpus2-batch10-synth_ext-offsetsFalse720/rtm_"+i_str+"/saved/"
+#path = "/slimdata/rafaeldata/seam_rtm_diffusion/sampling/galactic_back_1001/wi_final/saved/"
 
 files_rtm = dnnlib.util.list_dir(path)
 
@@ -106,7 +106,7 @@ plt.figure(figsize=(15,6)); #plt.title("Uncertainty")
 plt.imshow(np.std(images_np_stack,axis=0)[0,:,:],  vmin=0, vmax=0.15,  cmap = "magma",aspect=6, extent=extent)
 #cb = plt.colorbar(fraction=0.0235, pad=0.01); cb.set_label('[Km/s]')
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]"); 
-plt.savefig(os.path.join(image_dir, "_p"+str(num_post_samples)+"wnextstd.png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir, "_p"+str(num_post_samples)+"wnextstd.png"),bbox_inches = "tight",dpi=100); plt.close()
 
 
 

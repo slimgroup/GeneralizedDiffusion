@@ -85,8 +85,8 @@ dataset_name = "synth_salt"
 #net_name = "00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse691"
 #net_name = "00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue451"
 #net_name = "00159-gpus2-batch10-synth_salt_badback-offsetsTrue240"
-#net_name = "00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue631"
-net_name = "00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse931"
+net_name = "00162-gpus2-batch10-synth_salt_badback_cont-offsetsTrue631"
+#net_name = "00163-gpus2-batch10-synth_salt_badback_cont-offsetsFalse931"
 path = "sampling/"+net_name+"/rtm_"+i_str+"/saved/"
 
 files_rtm = dnnlib.util.list_dir(path)
@@ -103,11 +103,12 @@ for file_i in files_rtm:
     batch_count +=1
 
 
-
 from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import mean_squared_error
 
+post_std = np.std(images_np_stack,axis=0)[0,:,:]
 post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
+post_error = np.abs(post_mean-gt)
 ssim_t = ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
 
 
@@ -134,7 +135,7 @@ plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_post"
 #cmap_error = cc.cm['CET_L3']
 cmap_error = "magma"
 
-post_std = np.std(images_np_stack,axis=0)[0,:,:]
+
 plt.figure(figsize=(7,3));    #plt.title("Posterior deviation")
 plt.imshow(2*post_std,  vmin=0, vmax=0.5,   cmap = cmap_error, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
@@ -153,7 +154,7 @@ plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_std_"
 rmse_t = np.sqrt(mean_squared_error(gt, post_mean))
 rmsstd = np.sqrt(np.mean(post_std**2))
 
-post_error = np.abs(post_mean-gt)
+
 plt.figure(figsize=(7,3));  #plt.title("Error RMSE:"+str(round(rmse_t,4)))
 plt.imshow(post_error, vmin=0, vmax=0.5, cmap = cmap_error, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
@@ -217,11 +218,12 @@ plt.plot(range_depth,gt[:,trace_ind], linewidth=0.8,color="black", label="Ground
 #plt.plot(range_depth,lower_bound[:,trace_ind], linewidth=0.8,color="red",linestyle="--", label="Lower bound ")
 #plt.plot(range_depth,upper_bound[:,trace_ind], linewidth=0.8,color="red",linestyle="--", label="Upper bound ")
 #plt.ylim(1.2,to5.5)
+plt.fill_between(range_depth, lower_bound[:,trace_ind], upper_bound[:,trace_ind],color="red",alpha=0.2, label="Quantile range")
 plt.ylabel("Velocity [Km/s]")
 plt.xlabel("Depth [Km]")
 plt.legend()
 #plt.tight_layout()
-plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_traces_"+dataset_name+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_traces_band_"+dataset_name+".png"),bbox_inches = "tight",dpi=300); plt.close()
 
 
 
@@ -229,17 +231,17 @@ plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_traces
 uce, err_in_bin, avg_uncert_in_bin, prop_in_bin= uceloss(post_error, post_std, n_bins=20, outlier=0.0, range=None)
 
 
-fig, ax  = plt.subplots(1, 1, figsize=(4, 4))
+fig, ax  = plt.subplots(1, 1, figsize=(3, 3))
 #ax.plot([0, 0], [1, 1], 'k--')
 #plt.plot([0, 0], [1, 1], 'k--',color="black")
 ax.plot([0, 1], [0, 1], transform=ax.transAxes,linestyle="--",color="black",label="Perfect calibration")
 plt.plot(avg_uncert_in_bin,err_in_bin,color="red",label="UCE="+str(round(uce[0],4)))
-plt.xlim(0,1.5); plt.ylim(0,1.5);
+plt.xlim(0,1.7); plt.ylim(0,1.7);
 plt.ylabel("Error [Km/s]")
 plt.xlabel("Uncertainty [Km/s]")
 ax.set_aspect(1)
 plt.legend()
-plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_calibration_"+dataset_name+".png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_calibration_"+dataset_name+".png"),bbox_inches = "tight",dpi=400); plt.close()
 
 
 print(net_name)

@@ -71,6 +71,8 @@ from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import mean_squared_error
 
 post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
+post_std = np.std(images_np_stack,axis=0)[0,:,:]
+post_error = np.abs(post_mean-gt)
 ssim_t = ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
 
 
@@ -90,9 +92,9 @@ plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_mean_
 #cmap_error = cc.cm['CET_L3']
 cmap_error = "magma"
 
-post_std = np.std(images_np_stack,axis=0)[0,:,:]
+
 plt.figure(figsize=(7,3));    #plt.title("Posterior deviation")
-plt.imshow(post_std,  vmin=0, vmax=0.5,   cmap = cmap_error, extent=extent)
+plt.imshow(2*post_std,  vmin=0, vmax=0.5,   cmap = cmap_error, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
 #plt.colorbar(fraction=0.0235, pad=0.04)
 plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_std_compass.png"),bbox_inches = "tight",dpi=300); plt.close()
@@ -109,7 +111,7 @@ plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_std_c
 rmse_t = np.sqrt(mean_squared_error(gt, post_mean))
 rmsstd = np.sqrt(np.mean(post_std**2))
 
-post_error = np.abs(post_mean-gt)
+
 plt.figure(figsize=(7,3));  #plt.title("Error RMSE:"+str(round(rmse_t,4)))
 plt.imshow(post_error, vmin=0, vmax=0.5, cmap = cmap_error, extent=extent)
 plt.ylabel("Depth [Km]"); plt.xlabel("X [Km]");  #plt.axis("off"); 
@@ -166,17 +168,88 @@ plt.figure(figsize=(7,3)); #plt.title("Vertical trace at X grid point "+str(trac
 for i in range(1,num_post_samples):
     plt.plot(range_depth,images_np_stack[i,0,:,trace_ind], linewidth=0.4, alpha=0.3, color="red")
 
+
 plt.plot(range_depth,images_np_stack[15,0,:,trace_ind], linewidth=0.8,color="red", alpha=0.3, label="Posterior samples")
 #plt.plot(images_np_stack[15,0,:,trace_ind], linewidth=0.8,color="black", label="Ground truth")
 plt.plot(range_depth,gt[:,trace_ind], linewidth=0.8,color="black", label="Ground truth ")
 #plt.plot(range_depth,lower_bound[:,trace_ind], linewidth=0.8,color="red",linestyle="--", label="Lower bound ")
 #plt.plot(range_depth,upper_bound[:,trace_ind], linewidth=0.8,color="red",linestyle="--", label="Upper bound ")
 #plt.ylim(1.2,to5.5)
+#plt.fill_between(range_depth, lower_bound[:,trace_ind], upper_bound[:,trace_ind],color="gray",alpha=0.2, label="Quantile range")
+plt.fill_between(range_depth, lower_bound[:,trace_ind], upper_bound[:,trace_ind],color="red",alpha=0.2, label="Quantile range")
 plt.ylabel("Velocity [Km/s]")
 plt.xlabel("Depth [Km]")
 plt.legend()
+plt.ylim(1.35,4.55)
 #plt.tight_layout()
 plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_traces_compass.png"),bbox_inches = "tight",dpi=300); plt.close()
+
+
+
+trace_ind = 250
+#for trace_ind in range(240,265):
+print(trace_ind)
+net_name = "00172-gpus2-batch10-compass-offsetsFalse150"
+#net_name = "00167-gpus2-batch10-compass-offsetsTrue120"
+path = "sampling/"+net_name+"/rtm_"+i_str+"/saved/"
+files_rtm = dnnlib.util.list_dir(path)
+first = np.load(path+"000000.npy")
+num_post_samples = len(files_rtm)  # Assuming num_expected is defined
+images_np_stack = np.zeros((num_post_samples,1,first.shape[0],first.shape[1]))
+batch_count = 0
+for file_i in files_rtm:
+    file_str = path+file_i
+    images_np_stack[batch_count,0,:,:] = np.load(file_str)
+    batch_count +=1
+
+lower_bound = np.percentile(images_np_stack[:,0,:,:], lower_percentile, axis=0)
+upper_bound = np.percentile(images_np_stack[:,0,:,:], upper_percentile, axis=0)
+coverage_mask = (gt[:,trace_ind] >= lower_bound[:,trace_ind]) & (gt[:,trace_ind] <= upper_bound[:,trace_ind])
+coverage_1 = np.mean(coverage_mask) * 100 
+range_depth = [d * i for i in range(0, 256)]
+plt.figure(figsize=(7,3)); #plt.title("Vertical trace at X grid point "+str(trace_ind))
+for i in range(1,num_post_samples):
+    plt.plot(range_depth,images_np_stack[i,0,:,trace_ind], linewidth=0.4, alpha=0.3, color="red")
+
+plt.plot(range_depth,images_np_stack[15,0,:,trace_ind], linewidth=0.8,color="red", alpha=0.3, label="Posterior samples")
+plt.plot(range_depth,gt[:,trace_ind], linewidth=0.8,color="black", label="Ground truth ")
+plt.fill_between(range_depth, lower_bound[:,trace_ind], upper_bound[:,trace_ind],color="red",alpha=0.2, label="Quantile range")
+plt.ylabel("Velocity [Km/s]")
+plt.xlabel("Depth [Km]")
+plt.legend()
+plt.ylim(1.35,4.55)
+plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+str(trace_ind)+"_traces_compass.png"),bbox_inches = "tight",dpi=300); plt.close()
+net_name = "00167-gpus2-batch10-compass-offsetsTrue120"
+path = "sampling/"+net_name+"/rtm_"+i_str+"/saved/"
+files_rtm = dnnlib.util.list_dir(path)
+first = np.load(path+"000000.npy")
+num_post_samples = len(files_rtm)  # Assuming num_expected is defined
+images_np_stack = np.zeros((num_post_samples,1,first.shape[0],first.shape[1]))
+batch_count = 0
+for file_i in files_rtm:
+    file_str = path+file_i
+    images_np_stack[batch_count,0,:,:] = np.load(file_str)
+    batch_count +=1
+
+lower_bound = np.percentile(images_np_stack[:,0,:,:], lower_percentile, axis=0)
+upper_bound = np.percentile(images_np_stack[:,0,:,:], upper_percentile, axis=0)
+coverage_mask = (gt[:,trace_ind] >= lower_bound[:,trace_ind]) & (gt[:,trace_ind] <= upper_bound[:,trace_ind])
+coverage_2 = np.mean(coverage_mask) * 100 
+range_depth = [d * i for i in range(0, 256)]
+plt.figure(figsize=(7,3)); #plt.title("Vertical trace at X grid point "+str(trace_ind))
+for i in range(1,num_post_samples):
+    plt.plot(range_depth,images_np_stack[i,0,:,trace_ind], linewidth=0.4, alpha=0.3, color="red")
+
+plt.plot(range_depth,images_np_stack[15,0,:,trace_ind], linewidth=0.8,color="red", alpha=0.3, label="Posterior samples")
+plt.plot(range_depth,gt[:,trace_ind], linewidth=0.8,color="black", label="Ground truth ")
+plt.fill_between(range_depth, lower_bound[:,trace_ind], upper_bound[:,trace_ind],color="red",alpha=0.2, label="Quantile range")
+plt.ylabel("Velocity [Km/s]")
+plt.xlabel("Depth [Km]")
+plt.legend()
+plt.ylim(1.35,4.55)
+plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+str(trace_ind)+"_traces_compass.png"),bbox_inches = "tight",dpi=300); plt.close()
+print(coverage_2-coverage_1)
+
 
 
 
@@ -211,7 +284,7 @@ def uceloss(errors, uncert, n_bins=15, outlier=0.0, range=None):
 uce, err_in_bin, avg_uncert_in_bin, prop_in_bin= uceloss(post_error, post_std, n_bins=20, outlier=0.0, range=None)
 
 
-fig, ax  = plt.subplots(1, 1, figsize=(4, 4))
+fig, ax  = plt.subplots(1, 1, figsize=(3, 3))
 #ax.plot([0, 0], [1, 1], 'k--')
 #plt.plot([0, 0], [1, 1], 'k--',color="black")
 ax.plot([0, 1], [0, 1], transform=ax.transAxes,linestyle="--",color="black",label="Perfect calibration")
@@ -221,7 +294,7 @@ plt.ylabel("Error [Km/s]")
 plt.xlabel("Uncertainty [Km/s]")
 ax.set_aspect(1)
 plt.legend()
-plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_calibration_compass.png"),bbox_inches = "tight",dpi=300); plt.close()
+plt.savefig(os.path.join(image_dir,str(num_post_samples)+i_str+net_name+"_calibration_compass.png"),bbox_inches = "tight",dpi=400); plt.close()
 
 
 print(net_name)

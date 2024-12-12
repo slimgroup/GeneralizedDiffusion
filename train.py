@@ -59,7 +59,7 @@ def parse_int_list(s):
 @click.option('--cond',          help='Train class-conditional model', metavar='BOOL',              type=bool, default=False, show_default=True) 
 
 # Hyperparameters.
-@click.option('--duration',      help='Training duration', metavar='MIMG',                          type=click.FloatRange(min=0), default=200, show_default=True)
+@click.option('--duration',      help='Training duration', metavar='MIMG',                          type=click.FloatRange(min=0), default=20, show_default=True)
 @click.option('--batch',         help='Total batch size', metavar='INT',                            type=click.IntRange(min=1), default=4, show_default=True)
 @click.option('--batch-gpu',     help='Limit batch size per GPU', metavar='INT',                    type=click.IntRange(min=1))
 @click.option('--cbase',         help='Channel multiplier  [default: varies]', metavar='INT',       type=int)
@@ -88,8 +88,8 @@ def parse_int_list(s):
 @click.option('--desc',          help='String to include in result dir name', metavar='STR',        type=str)
 @click.option('--nosubdir',      help='Do not create a subdirectory for results',                   is_flag=True)
 @click.option('--tick',          help='How often to print progress', metavar='KIMG',                type=click.IntRange(min=1), default=1, show_default=True)
-@click.option('--snap',          help='How often to save snapshots', metavar='TICKS',               type=click.IntRange(min=1), default=30, show_default=True)
-@click.option('--dump',          help='How often to dump state', metavar='TICKS',                   type=click.IntRange(min=1), default=30, show_default=True)
+@click.option('--snap',          help='How often to save snapshots', metavar='TICKS',               type=click.IntRange(min=1), default=20, show_default=True)
+@click.option('--dump',          help='How often to dump state', metavar='TICKS',                   type=click.IntRange(min=1), default=20, show_default=True)
 @click.option('--seed',          help='Random seed  [default: random]', metavar='INT', default=5, type=int)
 @click.option('--transfer',      help='Transfer learning from network pickle', metavar='PKL|URL',   type=str)
 @click.option('--resume',        help='Resume from previous training state', metavar='PT',          type=str)
@@ -100,6 +100,7 @@ def parse_int_list(s):
 @click.option('--experiment_name', help='Name for the experiment to run', type=str, default="", required=False, show_default=True)
 @click.option('--project_name', help='Name for the project (one project for many experiments) to run', type=str, default="conditional_diffusion", required=False, show_default=True)
 
+# @click.option('--n_hidden', help='hidden layer', metavar='INT',  default=64,  type=click.IntRange(min=32))
 
 def main(**kwargs):
     opts = dnnlib.EasyDict(kwargs)

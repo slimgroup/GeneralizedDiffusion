@@ -31,10 +31,10 @@ import uuid
 from distutils.util import strtobool
 from typing import Any, List, Tuple, Union, Optional
 #import s3fs
-from torch_utils import distributed as dist
+#from torch_utils import distributed as dist
 import torch
 import PIL
-from torchvision import transforms
+#from torchvision import transforms
 import torch.nn.functional as F
 
 # Util classes

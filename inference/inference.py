@@ -277,7 +277,7 @@ if __name__ == "__main__":
     seeds = [i for i in range(0, 100)]
     max_batch_size = 1
     num_generate = 64
-    num_steps = 10
+    num_steps = 20
 
     device = torch.device('cuda')
     #device = torch.device('cpu')

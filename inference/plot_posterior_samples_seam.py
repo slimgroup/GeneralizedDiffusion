@@ -9,9 +9,6 @@ import colorcet as cc
 from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import mean_squared_error
 
-
-
-
 def uceloss(errors, uncert, n_bins=15, outlier=0.0, range=None):
     #device = errors.device
     if range == None:
@@ -43,12 +40,13 @@ def uceloss(errors, uncert, n_bins=15, outlier=0.0, range=None):
 
 plt.rcParams["font.family"] = "serif"
 
+image_dir = "sampling/final_plots/seam/"
 
 vmin_gt = 1.5
 vmax_gt = 4.75
 cmap_gt = cc.cm['rainbow4']
-
-
+cmap_gray= cc.cm['CET_L1']
+cmap_error = "magma"
 #for i_str in ["0008"]:
 i_str = "0004"
 gt  = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/gts_seam_filter_test/gt_"+i_str+".npy")
@@ -65,18 +63,44 @@ plt.ylabel("Z [Km]"); plt.xlabel("X [Km]");
 #cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
 plt.savefig(os.path.join("sampling/final_plots/seam/gt_seam.png"), bbox_inches = "tight", dpi=300)
 
+
+plt.figure(figsize=(12,5));  
+plt.imshow(gt, vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt, extent=extent,aspect=1)
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/gt_seam_noaxis.png"), bbox_inches = "tight", dpi=300)
+
+
+
+
 plt.figure(figsize=(12,5));  
 plt.imshow(gt0, vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt,extent=extent, aspect=1)
 plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
-#cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
+cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
 plt.savefig(os.path.join("sampling/final_plots/seam/gt0_seam.png"), bbox_inches = "tight", dpi=300)
-a = np.quantile(np.absolute(rtm),0.95)
 
+a = np.quantile(np.absolute(rtm),0.95)
 plt.figure(figsize=(12,5));  
 plt.imshow(rtm, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
 plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
 #cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
 plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_0.png"), bbox_inches = "tight", dpi=300)
+
+
+#laplacian of gt 
+from scipy import ndimage
+gt_lap = ndimage.laplace(gt)
+
+a = np.quantile(np.absolute(gt_lap),0.95)
+
+plt.figure(figsize=(12,5));  
+plt.imshow(gt_lap, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+plt.axis("off")
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/gt_seam_lap.png"), bbox_inches = "tight", dpi=300)
+
+
 
 
 rtm1 = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_v1_0005.npy")
@@ -91,16 +115,36 @@ plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_1_seismic.png"), bb
 
 
 
-rtmgt = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_gt_0005.npy")
+#rtmgt = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_gt_0005.npy")
+rtmgt = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_vgt_ext_better_il_0005_p1.npy")
+#rtmgt = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_vgt_ext_better_il_mathias__p1.npy")
 a = np.quantile(np.absolute(rtmgt),0.95)
 
+
+
 plt.figure(figsize=(12,5));  
-plt.imshow(rtmgt, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+plt.imshow(rtmgt, cmap=cmap_gray, vmin=-a, vmax=a,extent=extent, aspect=1)
 #plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
 plt.axis("off")
 #cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
-plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_gt_noaxis.png"), bbox_inches = "tight", dpi=300)
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_gt_noaxis_mathias_95.png"), bbox_inches = "tight", dpi=300)
 
+
+plt.figure(figsize=(12,5));  
+plt.imshow(rtmgt[512:,:], cmap=cmap_gray, vmin=-a, vmax=a,extent=extent, aspect=1)
+plt.axis("off")
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_gt_noaxis_half.png"), bbox_inches = "tight", dpi=300)
+
+
+rtm2_ext = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_v2_ext_0005.npy")
+a = np.quantile(np.absolute(rtm2_ext),0.95)
+
+plt.figure(figsize=(12,5));  
+plt.imshow(rtm2_ext, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_ext_v2_noaxis.png"), bbox_inches = "tight", dpi=300)
 
 
 
@@ -116,16 +160,270 @@ plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_noaxis.png"), bb
 
 
 
+plt.figure(figsize=(12,5));  
+plt.imshow(rtm2-rtmgt, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_error_gt.png"), bbox_inches = "tight", dpi=300)
 
-image_dir = "sampling/final_plots/seam/"
+
+
+plt.figure(figsize=(12,5));  
+plt.imshow(rtm2_ext-rtmgt, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_error_gt.png"), bbox_inches = "tight", dpi=300)
+
+
+np.linalg.norm(rtm2-rtmgt)
+np.linalg.norm(rtms_post_v2_ext_freq-rtmgt)
+# >>> np.linalg.norm(rtm2-rtmgt)
+# 13386592000.0
+ # 11118640000.0
+
+#np.linalg.norm(rtm2_ext-rtmgt)
+#11118640000.0
+
+#with more posterior samples 64
+# >>> np.linalg.norm(rtm2_ext-rtmgt)
+# 11010245000.0
+# >>> 
+
+# >>> np.linalg.norm(rtms_post_v2_ext_freq-rtmgt)
+# 6.891078188599325e-05
+
+
+plt.figure(figsize=(12,5));  
+plt.imshow(np.abs(rtm2-rtmgt), cmap=cmap_error, vmin=0, vmax=1e8,  extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_error_gt_magma.png"), bbox_inches = "tight", dpi=300)
+
+rtms_post_v2 = np.zeros((16,1,gt.shape[0],gt.shape[1]))
+
+for i in range(16):
+    rtms_post_v2[i,:,:,:]= np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_v2_0005_p"+str(i+1)+".npy")
+
+
+rtms_post_v2_ext = np.zeros((32,1,gt.shape[0],gt.shape[1]))
+
+for i in range(32):
+    rtms_post_v2_ext[i,:,:,:]= np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_v2_ext_0005_p"+str(i+1)+".npy")
+
+
+
+first = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_v2_ext_better_il_0005_p1.npy")
+rtms_post_v2_ext_freq = np.zeros((64,1,first.shape[0],first.shape[1]))
+
+for i in range(16):
+    rtms_post_v2_ext_freq[i,:,:,:]= np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_v2_ext_better_il_0005_p"+str(i+1)+".npy")
+
+for i in range(16,64):
+    rtms_post_v2_ext_freq[i,:,:,:]= np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_paper/rtm_vgt_ext_better_il_0005_p"+str(i+1)+".npy")
+
+
+post_std_rtm_ext_freq = np.std(rtms_post_v2_ext_freq,axis=0)[0,:,:]
+post_mean_rtm_ext_freq = np.mean(rtms_post_v2_ext_freq,axis=0)[0,:,:]
+
+post_std_rtm_ext = np.std(rtms_post_v2_ext,axis=0)[0,:,:]
+post_std_rtm = np.std(rtms_post_v2,axis=0)[0,:,:]
+
+plt.figure(figsize=(12,5));  
+plt.imshow(3*post_std_rtm_ext_freq[:,:], cmap=cmap_error, vmin=0,vmax=9e-08, extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_freq_std_64.png"), bbox_inches = "tight", dpi=300)
+
+
+plt.figure(figsize=(12,5));  
+plt.imshow(3*post_std_rtm_ext_freq[512:,:], cmap=cmap_error, vmin=0,vmax=9e-08, extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_freq_std_half_64.png"), bbox_inches = "tight", dpi=300)
+
+a = np.quantile(np.absolute(post_mean_rtm_ext_freq),0.95)
+plt.figure(figsize=(12,5));  
+plt.imshow(post_mean_rtm_ext_freq[512:,:], cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_freq_rtms_mean_half_64.png"), bbox_inches = "tight", dpi=300)
+
+
+for i in range(1,10):
+    a = np.quantile(np.absolute(rtms_post_v2_ext_freq[i,0,:,:]),0.95)
+    plt.figure(figsize=(12,5));  
+    plt.imshow(rtms_post_v2_ext_freq[i,0,:,:], cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+    #plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+    plt.axis("off")
+    plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_freq_rtms_p"+str(i)+".png"), bbox_inches = "tight", dpi=200)
+
+for i in range(1,10):
+    a = np.quantile(np.absolute(rtms_post_v2_ext_freq[i,0,:,:]),0.95)
+    plt.figure(figsize=(12,5));  
+    plt.imshow(rtms_post_v2_ext_freq[i,0,512:,:], cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+    #plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+    plt.axis("off")
+    plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_freq_rtms_half_p"+str(i)+".png"), bbox_inches = "tight", dpi=200)
+
+# convert -delay 15 -loop 0 sampling/final_plots/seam/rtm_seam_v2_ext_freq_rtms_p*.png sampling/final_plots/seam/rtm_movie.gif
+
+# convert -delay 15 -loop 0 sampling/final_plots/seam/rtm_seam_v2_ext_freq_rtms_half_p*.png sampling/final_plots/seam/rtm_movie_half.gif
+
+
+plt.figure(figsize=(12,5));  
+plt.imshow(np.abs(post_mean_rtm_ext_freq[512:,:]-rtmgt[512:,:]), cmap=cmap_error, vmin=0,vmax=9e-08, extent=extent, aspect=1)
+plt.axis("off")
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_freq_rtms_error_half_64.png"), bbox_inches = "tight", dpi=300)
+
+
+
+plt.figure(figsize=(12,5));  
+plt.imshow(3*post_std_rtm_ext, cmap=cmap_error, vmin=0, vmax=1e8, extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_std_gt_magma.png"), bbox_inches = "tight", dpi=300)
+
+
+
+plt.figure(figsize=(12,5));  
+plt.imshow(3*post_std_rtm, cmap=cmap_error, vmin=0, vmax=1e8, extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_std_gt_magma.png"), bbox_inches = "tight", dpi=300)
+
+#mean of rtms 
+post_mean_rtm = np.mean(rtms_post_v2,axis=0)[0,:,:]
+post_mean_rtm_ext = np.mean(rtms_post_v2_ext,axis=0)[0,:,:]
+
+
+from scipy.signal import hilbert
+import numpy as np
+
+def normalize_std(mu, sigma):
+    analytic_mu = hilbert(mu, axis=1)
+    return sigma*np.abs(analytic_mu)/(np.abs(analytic_mu)**2 + 5000000000000), analytic_mu
+
+
+post_std_rtm_ext_norm, analytic_mu = normalize_std(post_mean_rtm_ext, post_std_rtm_ext)
+
+
+a = np.quantile(np.absolute(post_std_rtm_ext_norm),0.98)
+plt.figure(figsize=(12,5));  
+plt.imshow(post_std_rtm_ext_norm, cmap=cmap_error, vmax=a,vmin=0, extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_std_norm.png"), bbox_inches = "tight", dpi=300)
+
+
+
+np.linalg.norm(post_mean_rtm-rtmgt)
+np.linalg.norm(post_mean_rtm_ext-rtmgt)
+# >>> np.linalg.norm(rtm2-rtmgt)
+# 13386592000.0
+ #10885423727.570002
+ # 9549810682.278156 #np.linalg.norm(post_mean_rtm_ext-rtmgt)
+
+a = np.quantile(np.absolute(post_mean_rtm),0.95)
+plt.figure(figsize=(12,5));  
+plt.imshow(post_mean_rtm, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_rtms_mean.png"), bbox_inches = "tight", dpi=300)
+
+
+a = np.quantile(np.absolute(post_mean_rtm_ext),0.95)
+plt.figure(figsize=(12,5));  
+plt.imshow(post_mean_rtm_ext, cmap="gray", vmin=-a, vmax=a,extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_rtms_mean.png"), bbox_inches = "tight", dpi=300)
+
+
+
+
+
+
+cmap_error = "magma"
+plt.figure(figsize=(12,5));  
+plt.imshow(np.abs(post_mean_rtm_ext-rtmgt), cmap=cmap_error, vmin=0, vmax=1e8,  extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_ext_error_gt_magma_wmean.png"), bbox_inches = "tight", dpi=300)
+
+
+
+cmap_error = "magma"
+plt.figure(figsize=(12,5));  
+plt.imshow(np.abs(post_mean_rtm-rtmgt), cmap=cmap_error, vmin=0, vmax=1e8,  extent=extent, aspect=1)
+#plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+plt.axis("off")
+#cb = plt.colorbar(fraction=0.0242, pad=0.01); #cb.set_label('[Km/s]')
+plt.savefig(os.path.join("sampling/final_plots/seam/rtm_seam_v2_error_gt_magma_wmean.png"), bbox_inches = "tight", dpi=300)
+
+
+range_depth = range(512)
+trace_ind = 256 
+plt.figure(figsize=(7,3)); plt.title("Vertical trace at X grid point "+str(trace_ind))
+# for i in range(1,num_post_samples):
+#  
+#plt.plot(range_depth,post_mean_rtm[:,trace_ind], linewidth=0.8,color="red", alpha=0.3, label="Posterior samples")
+plt.plot(range_depth,rtm2[:,trace_ind], linewidth=0.8,color="red", alpha=0.3, label="RTM in posterior mean")
+
+#plt.plot(images_np_stack[15,0,:,trace_ind], linewidth=0.8,color="black", label="Ground truth")
+plt.plot(range_depth,rtmgt[:,trace_ind], linewidth=0.8,color="black", label="Ground truth ")
+plt.plot(range_depth,np.linalg.norm(rtmgt[:,trace_ind])*gt[:,trace_ind], linewidth=0.8,color="green", label="gt velocity")
+plt.plot(range_depth,np.linalg.norm(rtmgt[:,trace_ind])*post_mean_2[:,trace_ind], linewidth=0.8,color="blue", label="infered mean velocity")
+
+#plt.ylim(1.2,to5.5)
+
+plt.ylabel("Velocity [Km/s]")
+plt.xlabel("Depth [grid point]")
+plt.legend()
+plt.savefig(os.path.join("sampling/final_plots/seam/_trace_vert_rtm.png"),bbox_inches = "tight",dpi=300); plt.close()
+
+
+
+
+range_depth = range(512)
+trace_ind = 256 
+plt.figure(figsize=(3,7)); plt.title("Vertical trace at X grid point "+str(trace_ind))
+for i in range(1,num_post_samples):
+    plt.plot(images_np_stack[i,0,:,trace_ind],range_depth, linewidth=0.4, alpha=0.3, color="red")
+
+plt.plot(images_np_stack[15,0,:,trace_ind],range_depth, linewidth=0.8,color="red", alpha=0.3, label="Posterior samples")
+#plt.plot(images_np_stack[15,0,:,trace_ind], linewidth=0.8,color="black", label="Ground truth")
+plt.plot(gt[:,trace_ind],range_depth, linewidth=0.8,color="black", label="Ground truth ")
+#plt.ylim(1.2,to5.5)
+plt.set_ylim(512,0)
+plt.gca().invert_yaxis()
+plt.xlabel("Velocity [Km/s]")
+plt.ylabel("Depth [grid point]")
+plt.legend()
+plt.savefig(os.path.join("sampling/final_plots/seam/_p"+str(num_post_samples)+"trace_vert.png"),bbox_inches = "tight",dpi=300); plt.close()
+
+
+
 #path = "sampling/120/rtm_0001/saved/"
 
-path = "sampling/00179-gpus2-batch10-seam_filter-offsetsFalse210/rtm_"+i_str+"/saved/"
+#path = "sampling/00179-gpus2-batch10-seam_filter-offsetsFalse210/rtm_"+i_str+"/saved/"
+path = "sampling/00196-gpus2-batch4-seam_ext_512-offsetsTrue150/back/rtm_"+i_str+"/saved/"
 files_rtm = dnnlib.util.list_dir(path)
 
 
 first = np.load(path+"000000.npy")
-num_post_samples = 16  # Assuming num_expected is defined
+num_post_samples = len(files_rtm)
 images_np_stack = np.zeros((num_post_samples,1,first.shape[0],first.shape[1]))
 
 batch_count = 0
@@ -137,6 +435,9 @@ for file_i in files_rtm:
 
 post_mean_1 = np.mean(images_np_stack,axis=0)[0,:,:]
 ssim_t = ssim(gt,post_mean_1, data_range=np.max(gt) - np.min(gt))
+# >>> ssim_t
+# 0.7011606845663645
+
 
 
 #plot some posterior statistics
@@ -151,7 +452,7 @@ plt.savefig(os.path.join(image_dir, "_p"+str(num_post_samples)+"_seam_mean_1.png
 cmap_error = "magma"
 post_std = np.std(images_np_stack,axis=0)[0,:,:]
 plt.figure(figsize=(12,5));   #plt.title("Posterior deviation")
-plt.imshow(2*post_std,  vmin=0, vmax=0.5,   cmap = cmap_error,extent=extent, aspect=1)
+plt.imshow(post_std,  vmin=0, vmax=0.5,   cmap = cmap_error,extent=extent, aspect=1)
 plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
 #plt.colorbar(fraction=0.0235, pad=0.04)
 plt.savefig(os.path.join(image_dir, "_p"+str(num_post_samples)+"_seam_std_1.png"),bbox_inches = "tight",dpi=300); plt.close()
@@ -174,11 +475,15 @@ threshold = 2
 
 support = post_error / (post_std+1e-1)
 perc_256 = np.mean((support) > threshold)*100
+print(perc_256)
 
 # >>> perc_256
 # 27.57110595703125
 # >>> perc_256
 # 25.742949039564223
+
+# >>> perc_256
+# 3.441486883600917
 
 plt.figure(figsize=(12,5));    #plt.title("Posterior deviation")
 plt.imshow(support,  vmin=0, vmax=threshold,   cmap = cmap_error_gray,extent=extent, aspect=1)
@@ -190,13 +495,23 @@ plt.savefig(os.path.join(image_dir, "_p"+str(num_post_samples)+i_str+"_seam_boum
 
 for i in range(1,10):
     plt.figure(figsize=(12,5));  
-    plt.imshow(images_np_stack[i,0,:,:], vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt, aspect=1)
-    plt.ylabel("Z [grid]"); plt.xlabel("X [grid]"); 
+    plt.imshow(images_np_stack[i,0,:,:], vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt,extent=extent, aspect=1)
+    plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
     #cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
-    plt.savefig(os.path.join(image_dir, "posterior_"+str(i)+".png"), bbox_inches = "tight", dpi=200)
+    plt.savefig(os.path.join(image_dir, "aspire_1_posterior_"+str(i)+".png"), bbox_inches = "tight", dpi=200)
 
 # convert -delay 15 -loop 0 sampling/final_plots/seam/posterior_*.png sampling/final_plots/seam/samples_movie.gif
 # echo "Experiment done!"
+
+
+lower_percentile=1
+upper_percentile=99
+lower_bound = np.percentile(images_np_stack[:,0,:,:], lower_percentile, axis=0)
+upper_bound = np.percentile(images_np_stack[:,0,:,:], upper_percentile, axis=0)
+# Create a mask where the ground truth is within the credible interval
+coverage_mask = (gt >= lower_bound) & (gt <= upper_bound)
+# Calculate the coverage as the percentage of pixels inside the credible interval
+coverage = np.mean(coverage_mask) * 100 
 
 range_km = [d*i for i in range(0,512)]
 trace_ind = 625 
@@ -263,8 +578,11 @@ dataset_name = "seam"
 
 i_str = "0004"
 #path = "sampling/00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue570/rtm_"+i_str+"/saved/"
-net_name_path = "00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue570"
-#net_name_path = "00187-gpus2-batch10-seam_filter_2_stack-offsetsTrue300"
+#net_name_path = "00203-gpus2-batch4-seam_ext_512_real_2_stack_noback-offsetsTrue180"
+#net_name_path = "00203-gpus2-batch4-seam_ext_512_real_2_stack_noback-offsetsTrue280"
+
+#net_name_path = "00201-gpus2-batch4-seam_ext_512_real_2_stack-offsetsTrue301"
+net_name_path = "00203-gpus2-batch4-seam_ext_512_real_2_stack_noback-offsetsTrue180"
 net_name = net_name_path[-3:]+net_name_path[-7:-3]
 
 path = "sampling/"+net_name_path+"/rtm_"+i_str+"/saved/"
@@ -282,9 +600,21 @@ for file_i in files_rtm:
     images_np_stack[batch_count,0,:,:] = np.load(file_str)
     batch_count +=1
 
+# for i in range(1,10):
+#     plt.figure(figsize=(12,5));  
+#     plt.imshow(images_np_stack[i,0,:,:], vmin=vmin_gt, vmax=vmax_gt, cmap=cmap_gt,extent=extent, aspect=1)
+#     plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
+#     #cb = plt.colorbar(fraction=0.0242, pad=0.01); cb.set_label('[Km/s]')
+#     plt.savefig(os.path.join(image_dir, "aspire_2_posterior_"+str(i)+".png"), bbox_inches = "tight", dpi=200)
+
+# convert -delay 15 -loop 0 /slimdata/rafaeldata/GeneralizedDiffusion/sampling/final_plots/seam/aspire_2_posterior_*.png /slimdata/rafaeldata/GeneralizedDiffusion/sampling/final_plots/seam/aspire_2_posterior.gif
+
+# convert -delay 15 -loop 0 /slimdata/rafaeldata/GeneralizedDiffusion/sampling/final_plots/seam/aspire_1_posterior_*.png /slimdata/rafaeldata/GeneralizedDiffusion/sampling/final_plots/seam/aspire_1_posterior.gif
+
 
 post_mean_2 = np.mean(images_np_stack,axis=0)[0,:,:]
 ssim_t = ssim(gt,post_mean_2, data_range=np.max(gt) - np.min(gt))
+
 
 
 #plot some posterior statistics
@@ -295,11 +625,17 @@ plt.ylabel("Z [Km]"); plt.xlabel("X [Km]");
 plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_mean_"+dataset_name+".png"),bbox_inches = "tight",dpi=300); plt.close()
 
 
+plt.figure(figsize=(12,5));  # plt.title("Posterior mean SSIM:"+str(round(ssim_t,4)))
+plt.imshow(post_mean_2,  vmin=vmin_gt,vmax=vmax_gt,   cmap = cmap_gt,extent=extent, aspect=1)
+plt.axis("off")
+plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_mean_noaxis"+dataset_name+".png"),bbox_inches = "tight",dpi=300); plt.close()
+
+
 #import colorcet as cc;cmap_error = cc.cm['CET_L3']
 cmap_error = "magma"
 post_std = np.std(images_np_stack,axis=0)[0,:,:]
 plt.figure(figsize=(12,5));   #plt.title("Posterior deviation")
-plt.imshow(2*post_std,  vmin=0, vmax=0.5,   cmap = cmap_error,extent=extent, aspect=1)
+plt.imshow(post_std,  vmin=0, vmax=0.5,   cmap = cmap_error,extent=extent, aspect=1)
 plt.ylabel("Z [Km]"); plt.xlabel("X [Km]"); 
 #plt.colorbar(fraction=0.0235, pad=0.04)
 plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_std_"+dataset_name+".png"),bbox_inches = "tight",dpi=300); plt.close()
@@ -317,8 +653,11 @@ plt.savefig(os.path.join(image_dir, str(num_post_samples)+i_str+net_name+"_error
 
 ##################################################################
 threshold = 2
-support = post_error / (2*post_std+1e-1)
+support = post_error / (post_std+1e-1)
 perc_256 = np.mean((support) > threshold)*100
+print(perc_256)
+# >>> perc_256
+# 2.0339825831422016
 
 cmap_error_gray = cc.cm['CET_L1']
 cmap_error_gray.set_over('red')
@@ -391,7 +730,36 @@ print(rmse_t)
 print(ssim_t)
 print(rmsstd)
 
+# >>> print(net_name)
+# 280True
+# >>> print(uce)
+# [0.04351995]
+# >>> print(coverage)
+# 73.60795047305045
+# >>> print(perc_256)
+# 4.407634210149083
+# >>> print(rmse_t)
+# 0.2120619707810562
+# >>> print(ssim_t)
+# 0.7039108014130266
+# >>> print(rmsstd)
+# 0.12860713016058048
 
+
+# >>> print(net_name)
+# 180True
+# >>> print(uce)
+# [0.03421645]
+# >>> print(coverage)
+# 76.90172107941514
+# >>> print(perc_256)
+# 17.099922950114678
+# >>> print(rmse_t)
+# 0.2070971217628311
+# >>> print(ssim_t)
+# 0.712839177041966
+# >>> print(rmsstd)
+# 0.13913872963614715
 
 
 # >>> print(net_name)

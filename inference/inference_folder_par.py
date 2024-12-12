@@ -70,7 +70,6 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     # Hence, the following measures how many batches are going to be per GPU.
     seeds = seeds[:num_generate]
     num_batches = ((len(seeds) - 1) // (max_batch_size * 1) + 1) *1
-    print(num_batches)
     #dist.print0(f"The algorithm will run for {num_batches} batches --  {len(seeds)} images of batch size {max_batch_size}")
     rank_batches = torch.as_tensor(seeds).tensor_split(num_batches)
     # the following has for each batch size allocated to this GPU, the indexes of the corresponding images.
@@ -297,7 +296,7 @@ if __name__ == "__main__":
    
     seeds = [i for i in range(0, 100)]
     max_batch_size = 1
-    num_generate = 16
+    num_generate = 32
     num_steps = 10
 
     device = torch.device('cuda')

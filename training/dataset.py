@@ -13,7 +13,6 @@ import zipfile
 import json
 import torch
 import dnnlib
-import matplotlib.pyplot as plt
 import random
 import pdb
 

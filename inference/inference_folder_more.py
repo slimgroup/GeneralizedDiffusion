@@ -9,7 +9,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 #from torch_utils import distributed as dist
 import dnnlib
-from training import dataset
+#from training import dataset
 from torch_utils.misc import StackedRandomGenerator
 import json
 from collections import OrderedDict
@@ -323,7 +323,7 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             coverage = np.mean(coverage_mask) * 100  # percentage
 
             threshold = 2
-            support = post_error / (post_std+1e-2)
+            support = post_error / (post_std+1e-1)
             zscore = np.mean((support) > threshold)*100
 
             #dist.print0("Everyone finished.. Starting calculation..")
@@ -345,13 +345,13 @@ if __name__ == "__main__":
    
     seeds = [i for i in range(0, 100)]
     max_batch_size = 1
-    num_generate = 64
     num_steps = 10
 
     device = torch.device('cuda')
     #device = torch.device('cpu')
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--num_gen', type=int, default=64)
     parser.add_argument('--cond_loc', type=str, default="")
     parser.add_argument('--back_loc', type=str, default=None)
     parser.add_argument('--network_loc', type=str, default="")
@@ -365,6 +365,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_offsets', action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
+    num_generate = args.num_gen
     cond_loc = args.cond_loc
     back_loc = args.back_loc
     vel_loc = args.gt_loc
@@ -376,6 +377,7 @@ if __name__ == "__main__":
     c_chan = args.c_chan
     num_skip = args.num_skip
     trained_res = args.trained_res
+
     print(use_offsets)
 
     training_options_loc = network_loc+"/training_options.json"
