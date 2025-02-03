@@ -2,4 +2,4 @@ See environment.yml for exact library dependencies. You can use the following co
 
 `conda env create -f environment.yml -n gendiff`
 
-`conda activate edm`
+`conda activate gendiff`
