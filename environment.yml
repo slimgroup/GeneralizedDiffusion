@@ -1,4 +1,4 @@
-name: edm
+name: gendiff
 channels:
   - pytorch
   - nvidia
