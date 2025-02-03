@@ -53,6 +53,101 @@ gt  = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/gts_seam_filter_test/gt_"
 gt0 = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/gt0s_seam_filter_test/gt0_"+i_str+".npy")
 rtm = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_seam_filter_test/rtm_"+i_str+".npy")
 
+
+
+
+n = (512,1744)
+n_offsets = 50
+rtm_ext = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_seam_ext_test/rtm_"+i_str+".npy")[:,:,:]
+#rtm_ext = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_seam_ext_2_stack_test/rtm_"+i_str+".npy")[:,:,:]
+#rtm_ext = np.load("/slimdata/rafaeldata/fwiuq_eod/seam_npz/rtms_seam_ext_512_2_nostack_test/rtm_"+i_str+".npy")[:,:,:]
+
+
+from matplotlib.gridspec import GridSpec
+
+# Assuming rtm, n, d, offset_start, offset_end, plot_path, savename, etc., are already defined
+
+# Reshape the array
+y = np.transpose(rtm_ext, axes=(1, 2, 0)).reshape(n[0], n[1], n_offsets, 1)
+
+# Set matplotlib font and size configurations
+plt.rc("figure", titlesize=40)
+plt.rc("font", family="serif")
+plt.rc("xtick", labelsize=40)
+plt.rc("ytick", labelsize=40)
+plt.rc("axes", labelsize=40)
+plt.rc("axes", titlesize=40)
+
+d = (0.02,0.02)
+# X, Z position in km
+xpos = 15.75#e3
+#for xpos in range(15,20):
+zpos = 6#e3 
+xgrid = int(round(xpos / d[0]))
+zgrid = int(round(zpos / d[1]))
+# Create a figure and a 2x2 grid of subplots
+fig = plt.figure(figsize=(25, 12))
+gs = GridSpec(2, 2, width_ratios=[6, 1], height_ratios=[1, 4], figure=fig)
+axs = np.empty((2, 2), dtype=object)
+axs[0, 0] = fig.add_subplot(gs[0, 0])
+axs[1, 0] = fig.add_subplot(gs[1, 0])
+axs[0, 1] = fig.add_subplot(gs[0, 1])
+axs[1, 1] = fig.add_subplot(gs[1, 1])
+# Adjust spacing
+fig.subplots_adjust(hspace=0.0, wspace=0.0)
+# Calculate vmin and vmax
+vmax1 = np.quantile(np.abs(y[zgrid,:, :, 0].ravel()), 0.99)
+vmin1 = -vmax1
+vmax2 = np.quantile(np.abs(y[:, :, n_offsets // 2, 0].ravel()), 0.95)
+vmin2 = -vmax2
+vmax3 = np.quantile(np.abs(y[:,xgrid, :, 0].ravel()), 0.999)
+vmin3 = -vmax3
+#offset_start = -500
+#offset_end   = 500
+offset_start = -2.00
+offset_end   = 2.00
+# Top left subplot
+axs[0, 0].imshow(y[zgrid,:, :, 0].T, aspect="auto", cmap="gray", interpolation="none", 
+                 vmin=vmin1, vmax=vmax1, extent=(0, (n[1] - 1) * d[0], offset_start, offset_end))
+axs[0, 0].set_ylabel("Offset [km]")
+axs[0, 0].set_xticklabels([])
+axs[0, 0].hlines(y=0, xmin=0, xmax=(n[1] - 1) * d[0], colors="b", linewidth=3)
+axs[0, 0].vlines(x=xpos, ymin=offset_start, ymax=offset_end, colors="b", linewidth=3)
+# Bottom left subplot
+axs[1, 0].imshow(y[:, :, n_offsets // 2, 0], aspect="auto", cmap="gray", interpolation="none", 
+                 vmin=vmin2, vmax=vmax2, extent=(0,(n[1] - 1) * d[1] , (n[0] - 1) * d[0] , 0))
+axs[1, 0].set_xlabel("X [Km]")
+axs[1, 0].set_ylabel("Depth [Km]")
+# axs[1, 0].set_xticks([0, 1, 2, 3, 4, 5])
+# axs[1, 0].set_xticklabels(["0", "1", "2", "3", "4", "5"])
+axs[1, 0].set_yticks([2, 4, 6,8])
+axs[1, 0].set_yticklabels(["2", "4", "6", "8"])
+axs[1, 0].hlines(y=zpos, xmin=0, xmax=(n[1] - 1) * d[1], colors="b", linewidth=3)
+axs[1, 0].vlines(x=xpos, ymin=0, ymax=(n[0] - 1) * d[0], colors="b", linewidth=3)
+# Top right subplot (invisible)
+axs[0, 1].set_visible(False)
+# Bottom right subplot
+axs[1, 1].imshow(y[:, xgrid, :, 0], aspect="auto", cmap="gray", interpolation="none", 
+                 vmin=vmin3, vmax=vmax3, extent=(offset_start, offset_end, (n[0] - 1) * d[1], 0))
+axs[1, 1].set_xlabel("Offset [km]")
+axs[1, 1].set_yticklabels([])
+axs[1, 1].hlines(y=zpos, xmin=offset_start, xmax=offset_end, colors="b", linewidth=3)
+axs[1, 1].vlines(x=0, ymin=0, ymax=(n[0] - 1) * d[1], colors="b", linewidth=3)
+# Remove spines
+for ax in axs.ravel():
+    if ax:
+        for spine in ["top", "right", "bottom", "left"]:
+            ax.spines[spine].set_visible(False)
+
+#plt.tight_layout()
+
+# Save the figure
+fig_name = f"fig_cig_seam.png"
+fig.savefig(f"{image_dir}/{fig_name}", bbox_inches="tight", pad_inches=0.4, dpi=300)
+plt.close(fig)
+
+
+
 d = 0.02
 extent = (0,d*gt.shape[1],d*gt.shape[0],0)
 
