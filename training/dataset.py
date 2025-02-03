@@ -104,7 +104,6 @@ class Dataset(torch.utils.data.Dataset):
         if not self.use_offsets:
             if len(cond.shape) > 2:
                 rtm_chan = int(round(cond.shape[0]/2))
-                print(rtm_chan)
                 cond = cond[rtm_chan,:,:]
             cond = cond[np.newaxis,...]
 
