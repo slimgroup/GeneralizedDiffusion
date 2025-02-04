@@ -7,20 +7,87 @@ import numpy as np
 import torch
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-#from torch_utils import distributed as dist
 import dnnlib
-#from training import dataset
 from torch_utils.misc import StackedRandomGenerator
 import json
 from collections import OrderedDict
 import warnings
-import matplotlib.pyplot as plt
 import argparse
+
 import colorcet as cc
-import pdb
+import matplotlib.pyplot as plt
 
 from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import mean_squared_error
+
+
+def ssim_mean(post,gt):
+    post_mean = np.mean(post,axis=0)
+    return 1-ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
+ 
+ 
+def nmse_mean(post,gt):
+    post_mean = np.mean(post,axis=0)
+    return np.sqrt(mean_squared_error(post_mean,gt)) #/ np.linalg.norm(gt)
+ 
+ 
+def coverage(post,gt,lower_perc=1,upper_perc=99):
+    lower_bound = np.percentile(post[:,:,:], lower_perc, axis=0)
+    upper_bound = np.percentile(post[:,:,:], upper_perc, axis=0)
+    # Create a mask where the ground truth is within the credible interval
+    coverage_mask = (gt >= lower_bound) & (gt <= upper_bound)
+    # Calculate the coverage as the percentage of pixels inside the credible interval
+    coverage = np.mean(coverage_mask) * 100  # percentage
+    return 100-coverage
+   
+ 
+def zscore(post, gt, threshold = 2,eps_div=1e-2):
+    post_mean = np.mean(post,axis=0)
+    post_std = np.std(post,axis=0)
+    post_error = np.abs(post_mean-gt)
+    support = post_error / (post_std + eps_div)
+    perc = np.mean((support) > threshold)*100
+    return perc
+ 
+ 
+def calibration(post,gt, n_bins=15, outlier=0.0, range=None):
+    post_mean = np.mean(post,axis=0)
+    post_std = np.std(post,axis=0)
+    post_error = np.abs(post_mean-gt)
+    if range == None:
+        bin_boundaries = np.linspace(post_std.min().item(), post_std.max().item(), n_bins + 1)
+    else:
+        bin_boundaries = np.linspace(range[0], range[1], n_bins + 1)
+    bin_lowers = bin_boundaries[:-1]
+    bin_uppers = bin_boundaries[1:]
+    errors_in_bin_list = []
+    avg_uncert_in_bin_list = []
+    prop_in_bin_list = []
+    uce = np.zeros(1)
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        # Calculated |uncertainty - error| in each bin
+        in_bin = (post_std > (bin_lower.item())) * (post_std < (bin_upper.item()))
+        prop_in_bin = in_bin.mean()  # |Bm| / n
+        prop_in_bin_list.append(prop_in_bin)
+        if prop_in_bin.item() > outlier:
+            errors_in_bin = post_error[in_bin].mean()  # err()
+            avg_uncert_in_bin = post_std[in_bin].mean()  # uncert()
+            uce += np.abs(avg_uncert_in_bin - errors_in_bin) * prop_in_bin
+            errors_in_bin_list.append(errors_in_bin)
+            avg_uncert_in_bin_list.append(avg_uncert_in_bin)
+    err_in_bin = errors_in_bin_list
+    avg_uncert_in_bin = avg_uncert_in_bin_list
+    prop_in_bin = prop_in_bin_list
+    #return uce, err_in_bin, avg_uncert_in_bin, prop_in_bin
+    return uce[0]
+ 
+def test_all(post,gt):
+    cov = coverage(post,gt)
+    z = zscore(post,gt)
+    cal = calibration(post,gt)
+    ssim = ssim_mean(post,gt)
+    nmse = nmse_mean(post,gt)
+    return cov, z, cal, ssim, nmse
 
 def ambient_sampler(
     net, latents, randn_like=torch.randn_like,
@@ -62,33 +129,6 @@ def ambient_sampler(
                 x_next = x_hat + (t_next - t_hat) * (0.5 * d_cur + 0.5 * d_prime)
 
     return gt_norm*x_next
-def uceloss(errors, uncert, n_bins=15, outlier=0.0, range=None):
-    #device = errors.device
-    if range == None:
-        bin_boundaries = np.linspace(uncert.min().item(), uncert.max().item(), n_bins + 1)
-    else:
-        bin_boundaries = np.linspace(range[0], range[1], n_bins + 1)
-    bin_lowers = bin_boundaries[:-1]
-    bin_uppers = bin_boundaries[1:]
-    errors_in_bin_list = []
-    avg_uncert_in_bin_list = []
-    prop_in_bin_list = []
-    uce = np.zeros(1)
-    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-        # Calculated |uncertainty - error| in each bin
-        in_bin = (uncert > (bin_lower.item())) * (uncert < (bin_upper.item()))
-        prop_in_bin = in_bin.mean()  # |Bm| / n
-        prop_in_bin_list.append(prop_in_bin)
-        if prop_in_bin.item() > outlier:
-            errors_in_bin = errors[in_bin].mean()  # err()
-            avg_uncert_in_bin = uncert[in_bin].mean()  # uncert()
-            uce += np.abs(avg_uncert_in_bin - errors_in_bin) * prop_in_bin
-            errors_in_bin_list.append(errors_in_bin)
-            avg_uncert_in_bin_list.append(avg_uncert_in_bin)
-    err_in_bin = errors_in_bin_list
-    avg_uncert_in_bin = avg_uncert_in_bin_list
-    prop_in_bin = prop_in_bin_list
-    return uce, err_in_bin, avg_uncert_in_bin, prop_in_bin
 
 
 def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_size, 
@@ -99,7 +139,6 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     seeds = seeds[:num_generate]
     num_batches = ((len(seeds) - 1) // (max_batch_size * 1) + 1) *1
     print(num_batches)
-    #dist.print0(f"The algorithm will run for {num_batches} batches --  {len(seeds)} images of batch size {max_batch_size}")
     rank_batches = torch.as_tensor(seeds).tensor_split(num_batches)
     # the following has for each batch size allocated to this GPU, the indexes of the corresponding images.
 
@@ -114,7 +153,6 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
     cond_loc = cond_base+files_cond[0]
 
     cond = np.load(cond_loc) / cond_norm
-    print(use_offsets)
     if not use_offsets:
         print("use only zero offset")
         if len(cond.shape) > 2:
@@ -176,13 +214,15 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
         net = net.to(device)
         #dist.print0(f'Network loaded!')
 
+        #save_path_metrics = os.path.join(outdir,"/",str(network_loc.split("/")[1]) +str(checkpoint_number))+ "_metrics"
         save_path_metrics = os.path.join(outdir,"metrics/",str(network_loc.split("/")[1]) +str(checkpoint_number))+ "_metrics"
+        os.mkdir(os.path.join(outdir,"metrics/")) 
 
         ###loop here 
         files_cond = dnnlib.util.list_dir(cond_base)
 
         ssims = []
-        rmses = []
+        nmses = []
         covs = []
         zscores = []
         uces = []
@@ -214,7 +254,6 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
             image_dir = os.path.join(outdir, str(network_loc.split("/")[1]) + str(checkpoint_number) + "/" + cond_loc[-12:-4])
             
-           
             os.makedirs(image_dir, exist_ok=True)
             
            
@@ -226,7 +265,6 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
                 cond = torch.cat([cond, background], axis=1)
 
-
                 plt.figure(); plt.title("Condition back")
                 plt.imshow(gt_norm*cond[0,-1,:,:].cpu(), vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
                 plt.axis("off")
@@ -235,18 +273,11 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
             a = np.quantile(np.absolute(cond[0,0,:,:].cpu()),0.95)
             plt.figure(); plt.title("Condition rtm")
-            plt.imshow(cond[0,0,:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
+            plt.imshow(cond[0,int(round((cond.shape[1]-1)/2)),:,:].cpu(), vmin=-a,vmax=a, cmap = "gray")
             plt.axis("off")
             cb = plt.colorbar(fraction=0.0235, pad=0.04); 
             plt.savefig(os.path.join(image_dir, "rtm_condition.png"),bbox_inches = "tight",dpi=300)
-
-
-
-        #pdb.set_trace()
-
-            
            
-
             plt.figure();  plt.title("Ground truth")
             plt.imshow(gt, vmin=vmin_gt,vmax=vmax_gt, cmap = cmap_gt)
             plt.axis("off")
@@ -255,7 +286,6 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
 
 
             # Loop over batches.
-            #dist.print0(f'Generating {len(seeds)} images to "{outdir}"...')
             batch_count = 1
             images_np_stack = np.zeros((len(seeds),1,*gt.shape))
             for batch_seeds in tqdm.tqdm(rank_batches):
@@ -291,10 +321,10 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
                 batch_count += 1
 
             # plot posterior statistics
-            post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
-            ssim_t = ssim(gt,post_mean, data_range=np.max(gt) - np.min(gt))
+            cov, z, cal, ssim, nmse = test_all(images_np_stack[:,0,:,:],gt)
 
-            plt.figure(); plt.title("Posterior mean SSIM:"+str(round(ssim_t,4)))
+            post_mean = np.mean(images_np_stack,axis=0)[0,:,:]
+            plt.figure(); plt.title("Posterior mean 1-SSIM:"+str(round(ssim,4)))
             plt.imshow(post_mean,  vmin=vmin_gt,vmax=vmax_gt,   cmap = cmap_gt)
             plt.axis("off"); 
             cb = plt.colorbar(fraction=0.0235, pad=0.04); cb.set_label('[Km/s]')
@@ -305,41 +335,32 @@ def main(network_loc, training_options_loc, outdir, seeds, num_steps, max_batch_
             plt.imshow(post_std,  vmin=0, vmax=0.5,   cmap = "magma")
             plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
             plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"std.png"),bbox_inches = "tight",dpi=300); plt.close()
-                
-            rmse_t = np.sqrt(mean_squared_error(gt, post_mean))
+         
             post_error = np.abs(post_mean-gt)
-            plt.figure(); plt.title("Error RMSE:"+str(round(rmse_t,4)))
+            plt.figure(); plt.title("Error NMSE:"+str(round(nmse,4)))
             plt.imshow(post_error, vmin=0, vmax=0.5, cmap = "magma")
             plt.axis("off"); plt.colorbar(fraction=0.0235, pad=0.04)
             plt.savefig(os.path.join(image_dir, "steps_"+str(num_steps)+"_num_"+str(num_generate)+"_error.png"),bbox_inches = "tight",dpi=300); plt.close()
 
-            uce, err_in_bin, avg_uncert_in_bin, prop_in_bin= uceloss(post_error, post_std, n_bins=20, outlier=0.0, range=None)
+            ssims.append(ssim)
+            nmses.append(nmse)
 
-            lower_percentile=1
-            upper_percentile=99
-            lower_bound = np.percentile(images_np_stack[:,0,:,:], lower_percentile, axis=0)
-            upper_bound = np.percentile(images_np_stack[:,0,:,:], upper_percentile, axis=0)
-            coverage_mask = (gt >= lower_bound) & (gt <= upper_bound)
-            coverage = np.mean(coverage_mask) * 100  # percentage
+            uces.append(cal)
+            covs.append(cov)
+            zscores.append(z)
 
-            threshold = 2
-            support = post_error / (post_std+1e-1)
-            zscore = np.mean((support) > threshold)*100
-
-            #dist.print0("Everyone finished.. Starting calculation..")
-            ssims.append(ssim_t)
-            rmses.append(rmse_t)
-
-            uces.append(uce)
-            covs.append(coverage)
-            zscores.append(zscore)
-
-            print("SSIM:"+str(ssim_t))
-            print("rmses:"+str(rmse_t))
-            
-            np.savez(save_path_metrics, ssims=ssims, rmses=rmses, uces=uces, covs=covs, zscores=zscores)
+            print("SSIM:"+str(ssim))
+            print("nmses:"+str(nmse))
+            print(save_path_metrics)
+            np.savez(save_path_metrics, ssims=ssims, nmses=nmses, uces=uces, covs=covs, zscores=zscores)
            
-        np.savez(save_path_metrics, ssims=ssims, rmses=rmses, uces=uces, covs=covs, zscores=zscores)
+        np.savez(save_path_metrics, ssims=ssims, nmses=nmses, uces=uces, covs=covs, zscores=zscores)
+
+        print(np.round(np.mean(covs),2),"+-", np.round(np.std(covs),1))
+        print(np.round(np.mean(zscores),2),"+-", np.round(np.std(zscores),1))
+        print(np.round(np.mean(uces),2),"+-", np.round(np.std(uces),1))
+        print(np.round(np.mean(ssims),2),"+-", np.round(np.std(ssims),1))
+        print(np.round(np.mean(nmses),3),"+-", np.round(np.std(nmses),2))
 
 if __name__ == "__main__":
    
@@ -351,7 +372,7 @@ if __name__ == "__main__":
     #device = torch.device('cpu')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_gen', type=int, default=64)
+    parser.add_argument('--num_gen', type=int, default=128)
     parser.add_argument('--cond_loc', type=str, default="")
     parser.add_argument('--back_loc', type=str, default=None)
     parser.add_argument('--network_loc', type=str, default="")
